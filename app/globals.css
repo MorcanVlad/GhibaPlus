@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Stiluri pentru fundal și text */
+body {
+  background-color: #0f172a; /* Slate 900 (Întunecat) */
+  color: white;
+}
+
+/* Efectul de Sticlă Mată */
+.glass {
+  background: rgba(255, 255, 255, 0.1); /* Alb transparent */
+  backdrop-filter: blur(16px);          /* Efect de ceață */
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Formele care plutesc (Blobs) */
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px); /* Le face difuze */
+  opacity: 0.7;
+  z-index: 0;
+}
+
+/* Viteze diferite pentru animații */
+.animate-blob-1 { animation: blob 7s infinite ease-in-out; }
+.animate-blob-2 { animation: blob 10s infinite ease-in-out reverse; }
+.animate-blob-3 { animation: blob 12s infinite ease-in-out; }
