@@ -154,10 +154,56 @@ export default function Dashboard() {
   // Widget Calendar
   const CalendarWidget = () => {
     const today = new Date();
-    const currentMonthEvents = calendarEvents.filter(ev => {
+    
+    // FILTRARE: Doar evenimente pentru "Toată Școala" SAU clasa userului
+    const relevantEvents = calendarEvents.filter(ev => {
+        // Dacă nu are targetClass setat (evenimente vechi), le considerăm globale
+        const target = ev.targetClass || "Toată Școala";
+        return target === "Toată Școala" || target === user.class;
+    });
+
+    // Filtrare după luna curentă pentru afișare
+    const currentMonthEvents = relevantEvents.filter(ev => {
         const evDate = new Date(ev.start);
         return evDate.getMonth() === today.getMonth() && evDate.getFullYear() === today.getFullYear();
     });
+
+    return (
+        <div className="glass p-6 rounded-3xl border border-white/5 sticky top-28">
+            <h3 className="font-bold text-lg mb-4 text-white flex items-center gap-2">
+                <span className="text-2xl">📅</span> Calendar {today.toLocaleString('ro-RO', { month: 'long' })}
+            </h3>
+            {currentMonthEvents.length === 0 ? <p className="text-gray-500 text-sm italic p-2">Niciun eveniment pentru tine luna asta.</p> : (
+                <div className="space-y-3">
+                    {currentMonthEvents.map(ev => {
+                         const typeInfo = CALENDAR_TYPES[ev.type as keyof typeof CALENDAR_TYPES] || {color: 'bg-gray-500'};
+                         return (
+                            <div key={ev.id} className={`p-4 rounded-2xl border border-white/5 bg-white/5 hover:bg-white/10 transition relative overflow-hidden`}>
+                                <div className={`absolute left-0 top-0 bottom-0 w-1 ${typeInfo.color}`}></div>
+                                <div className="flex justify-between items-start mb-1">
+                                    <div className={`text-[10px] font-bold uppercase ${typeInfo.color.replace('bg-', 'text-')} brightness-125`}>{typeInfo.label}</div>
+                                    {/* Eticheta "Pentru Tine" dacă e specific clasei */}
+                                    {ev.targetClass && ev.targetClass !== "Toată Școala" && (
+                                        <div className="text-[9px] bg-red-500 text-white px-1.5 rounded font-bold uppercase tracking-wider">CLASĂ</div>
+                                    )}
+                                </div>
+                                <div className="font-bold text-white text-sm leading-tight">{ev.title}</div>
+                                <div className="text-xs text-gray-400 mt-2 flex items-center gap-2">
+                                    <span className="bg-white/10 px-2 py-0.5 rounded text-white">{new Date(ev.start).getDate()}</span>
+                                    <span>-</span>
+                                    <span className="bg-white/10 px-2 py-0.5 rounded text-white">{new Date(ev.end).getDate()} {today.toLocaleString('ro-RO', { month: 'short' })}</span>
+                                </div>
+                            </div>
+                         )
+                    })}
+                </div>
+            )}
+            {/* Buton vizualizare toate (opțional) */}
+            <div className="mt-4 pt-4 border-t border-white/5 text-center">
+                 <p className="text-xs text-gray-500">Vezi doar evenimente relevante pentru {user.class || "tine"}.</p>
+            </div>
+        </div>
+    );
 
     return (
         <div className="glass p-6 rounded-3xl border border-white/5 sticky top-28">
