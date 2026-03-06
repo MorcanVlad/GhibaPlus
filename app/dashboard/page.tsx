@@ -1,21 +1,24 @@
 "use client";
 import { useEffect, useState } from "react";
 import { auth, db } from "../lib/firebase"; 
+import { sendPasswordResetEmail } from "firebase/auth"; // NOU: import pentru resetare
 import { useRouter } from "next/navigation";
-import { doc, getDoc, updateDoc, collection, getDocs, arrayUnion, arrayRemove, orderBy, onSnapshot, addDoc, query } from "firebase/firestore";
-import { SCHOOL_CLASSES } from "../lib/constants";
+import { doc, getDoc, updateDoc, collection, getDocs, arrayUnion, arrayRemove, orderBy, onSnapshot, addDoc, query, deleteDoc } from "firebase/firestore";
 
 const TRANSLATIONS: any = {
-  ro: { search: "Caută...", settings: "⚙️ Setări", admin: "ADMIN", welcomeTitle: "Bine ai venit!", welcomeMsg: "Ne bucurăm să te avem pe GhibaPlus. Aici vei găsi toate noutățile școlii!", joinEventTitle: "Înscriere Confirmată ✅", joinEventMsg: "Te-ai înscris cu succes la:", notif: "Notificări", noNotif: "Nicio notificare.", dateTime: "DATA / ORA", location: "LOCAȚIE", join: "Particip ✅", cancel: "Anulează", readMore: "📖 Citește mai mult", lang: "Limba Interfeței", class: "Clasa Ta (Blocat)", phone: "Număr de Telefon", save: "Salvează Setările", council: "Consiliul Elevilor", noSpots: "Locuri epuizate!" },
-  en: { search: "Search...", settings: "⚙️ Settings", admin: "ADMIN", welcomeTitle: "Welcome!", welcomeMsg: "Glad to have you on GhibaPlus. Here you'll find all school news!", joinEventTitle: "Registration Confirmed ✅", joinEventMsg: "Successfully joined:", notif: "Notifications", noNotif: "No notifications.", dateTime: "DATE / TIME", location: "LOCATION", join: "Join ✅", cancel: "Cancel", readMore: "📖 Read More", lang: "Interface Language", class: "Your Class (Locked)", phone: "Phone Number", save: "Save Settings", council: "Student Council", noSpots: "No spots left!" },
-  fr: { search: "Recherche...", settings: "⚙️ Paramètres", admin: "ADMIN", welcomeTitle: "Bienvenue !", welcomeMsg: "Heureux de vous avoir sur GhibaPlus !", joinEventTitle: "Inscription confirmée ✅", joinEventMsg: "Inscrit à :", notif: "Notifications", noNotif: "Pas de notifications.", dateTime: "DATE / HEURE", location: "LIEU", join: "Participer ✅", cancel: "Annuler", readMore: "📖 Détails", lang: "Langue", class: "Classe (Bloqué)", phone: "Téléphone", save: "Enregistrer", council: "Conseil", noSpots: "Complet!" },
-  de: { search: "Suche...", settings: "⚙️ Einstellungen", admin: "ADMIN", welcomeTitle: "Willkommen!", welcomeMsg: "Schön, dass du bei GhibaPlus bist!", joinEventTitle: "Anmeldung bestätigt ✅", joinEventMsg: "Beigetreten:", notif: "Benachrichtigungen", noNotif: "Keine Nachrichten.", dateTime: "DATUM / ZEIT", location: "ORT", join: "Teilnehmen ✅", cancel: "Stornieren", readMore: "📖 Details", lang: "Sprache", class: "Klasse (Gesperrt)", phone: "Telefon", save: "Speichern", council: "Schülerrat", noSpots: "Voll!" },
-  es: { search: "Buscar...", settings: "⚙️ Ajustes", admin: "ADMIN", welcomeTitle: "¡Bienvenido!", welcomeMsg: "Nos alegra tenerte en GhibaPlus.", joinEventTitle: "Registro Confirmado ✅", joinEventMsg: "Te uniste a:", notif: "Notificaciones", noNotif: "Sin notificaciones.", dateTime: "FECHA / HORA", location: "UBICACIÓN", join: "Participar ✅", cancel: "Cancelar", readMore: "📖 Detalles", lang: "Idioma", class: "Clase (Bloqueado)", phone: "Teléfono", save: "Guardar", council: "Consejo", noSpots: "¡Lleno!" }
+  ro: { search: "Caută...", settings: "⚙️ Setări", admin: "ADMIN", welcomeTitle: "Bine ai venit!", welcomeMsg: "Ne bucurăm să te avem pe GhibaPlus.", joinEventTitle: "Înscriere Confirmată ✅", joinEventMsg: "Te-ai înscris cu succes la:", notif: "Notificări", noNotif: "Nicio notificare.", dateTime: "DATA / ORA", location: "LOCAȚIE", join: "Particip ✅", cancel: "Anulează", readMore: "📖 Citește mai mult", lang: "Limba Interfeței", class: "Clasa Ta (Blocat)", phone: "Număr de Telefon", save: "Salvează Setările", council: "Consiliul Elevilor", noSpots: "Locuri epuizate!", translating: "Se traduce feed-ul...", resetPass: "🔑 Trimite link resetare parolă", resetSent: "Email-ul a fost trimis! Verifică Inbox-ul." },
+  en: { search: "Search...", settings: "⚙️ Settings", admin: "ADMIN", welcomeTitle: "Welcome!", welcomeMsg: "Glad to have you on GhibaPlus.", joinEventTitle: "Registration Confirmed ✅", joinEventMsg: "Successfully joined:", notif: "Notifications", noNotif: "No notifications.", dateTime: "DATE / TIME", location: "LOCATION", join: "Join ✅", cancel: "Cancel", readMore: "📖 Read More", lang: "Interface Language", class: "Your Class (Locked)", phone: "Phone Number", save: "Save Settings", council: "Student Council", noSpots: "No spots left!", translating: "Translating feed...", resetPass: "🔑 Send password reset link", resetSent: "Email sent! Check your Inbox." },
+  fr: { search: "Recherche...", settings: "⚙️ Paramètres", admin: "ADMIN", welcomeTitle: "Bienvenue !", welcomeMsg: "Heureux de vous avoir sur GhibaPlus !", joinEventTitle: "Inscription confirmée ✅", joinEventMsg: "Inscrit à :", notif: "Notifications", noNotif: "Pas de notifications.", dateTime: "DATE / HEURE", location: "LIEU", join: "Participer ✅", cancel: "Annuler", readMore: "📖 Détails", lang: "Langue", class: "Classe (Bloqué)", phone: "Téléphone", save: "Enregistrer", council: "Conseil", noSpots: "Complet!", translating: "Traduction du flux...", resetPass: "🔑 Réinitialiser le mot de passe", resetSent: "Email envoyé !" },
+  de: { search: "Suche...", settings: "⚙️ Einstellungen", admin: "ADMIN", welcomeTitle: "Willkommen!", welcomeMsg: "Schön, dass du bei GhibaPlus bist!", joinEventTitle: "Anmeldung bestätigt ✅", joinEventMsg: "Beigetreten:", notif: "Benachrichtigungen", noNotif: "Keine Nachrichten.", dateTime: "DATUM / ZEIT", location: "ORT", join: "Teilnehmen ✅", cancel: "Stornieren", readMore: "📖 Details", lang: "Sprache", class: "Klasse (Gesperrt)", phone: "Telefon", save: "Speichern", council: "Schülerrat", noSpots: "Voll!", translating: "Feed wird übersetzt...", resetPass: "🔑 Passwort zurücksetzen", resetSent: "E-Mail gesendet!" },
+  es: { search: "Buscar...", settings: "⚙️ Ajustes", admin: "ADMIN", welcomeTitle: "¡Bienvenido!", welcomeMsg: "Nos alegra tenerte en GhibaPlus.", joinEventTitle: "Registro Confirmado ✅", joinEventMsg: "Te uniste a:", notif: "Notificaciones", noNotif: "Sin notificaciones.", dateTime: "FECHA / HORA", location: "UBICACIÓN", join: "Participar ✅", cancel: "Cancelar", readMore: "📖 Detalles", lang: "Idioma", class: "Clase (Bloqueado)", phone: "Teléfono", save: "Guardar", council: "Consejo", noSpots: "¡Lleno!", translating: "Traduciendo feed...", resetPass: "🔑 Restablecer contraseña", resetSent: "¡Correo enviado!" }
 };
+
+const GOOGLE_TRANSLATE_API_KEY = "AIzaSyD1qygcjmZh6ToLB5VcbwHQXArzzvPYHj8";
 
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
   const [feed, setFeed] = useState<any[]>([]);
+  const [translatedFeed, setTranslatedFeed] = useState<any[]>([]); // NOU: Stocăm feed-ul tradus
   const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -25,6 +28,9 @@ export default function Dashboard() {
   const [editPhone, setEditPhone] = useState("");
   const [editLang, setEditLang] = useState("ro");
   const [darkMode, setDarkMode] = useState(true);
+  const [feedFilter, setFeedFilter] = useState("all"); 
+  const [isTranslating, setIsTranslating] = useState(false);
+  
   const router = useRouter();
 
   useEffect(() => {
@@ -51,14 +57,11 @@ export default function Dashboard() {
         ...aSnap.docs.map(d=>({id:d.id, col:'calendar_events', ...d.data()}))
     ];
     
-    // 1. Sortare pentru FEED (după data la care a fost creată postarea, descrescător)
     let feedItems = [...allItems].sort((a:any, b:any) => new Date(b.postedAt||b.date||0).getTime() - new Date(a.postedAt||a.date||0).getTime());
-    setFeed(feedItems.filter(item => item.type !== 'holiday' && item.type !== 'exam'));
+    const rawFeed = feedItems.filter(item => item.type !== 'holiday' && item.type !== 'exam');
+    setFeed(rawFeed);
     
-    // 2. Sortare pentru CALENDAR (cronologic după data evenimentului)
     let calItems = allItems.filter(item => item.col === 'calendar_events');
-    
-    // Filtru: Ascundem evenimentele care s-au terminat deja
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -66,19 +69,77 @@ export default function Dashboard() {
         const eventEndDate = new Date(item.endDate || item.date);
         return eventEndDate >= today;
     });
-
-    // Sortăm evenimentele crescător (cele mai apropiate sus)
     calItems.sort((a:any, b:any) => new Date(a.date||0).getTime() - new Date(b.date||0).getTime());
-    
     setCalendarEvents(calItems);
   };
 
   const t = TRANSLATIONS[editLang] || TRANSLATIONS["ro"];
 
+  // NOU: Funcția PROTEJATĂ de traducere
+  const translateText = async (text: string, targetLang: string) => {
+    if (!text || targetLang === 'ro') return text;
+    try {
+      const res = await fetch(`https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_TRANSLATE_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q: text, target: targetLang, source: 'ro' })
+      });
+      const data = await res.json();
+      
+      // Dacă Google refuză API-ul (ex: Billing neactivat), prevenim eroarea "Cannot read properties of undefined"
+      if (data.error) {
+        console.error("⛔ Eroare API Google Translate:", data.error.message);
+        return text; 
+      }
+      return data.data.translations[0].translatedText;
+    } catch (error) {
+      console.error("⛔ Eroare conexiune API:", error);
+      return text;
+    }
+  };
+
+  // NOU: Când se schimbă limba sau se încarcă feed-ul nou, traducem tot
+  useEffect(() => {
+    const translateWholeFeed = async () => {
+      if (editLang === 'ro' || feed.length === 0) {
+        setTranslatedFeed(feed);
+        return;
+      }
+      
+      setIsTranslating(true);
+      const newFeed = await Promise.all(feed.map(async (item) => {
+        try {
+          const tTitle = await translateText(item.title, editLang);
+          const tContent = await translateText(item.content, editLang);
+          return { ...item, translatedTitle: tTitle, translatedContent: tContent };
+        } catch (e) {
+          return item;
+        }
+      }));
+      
+      setTranslatedFeed(newFeed);
+      setIsTranslating(false);
+    };
+
+    translateWholeFeed();
+  }, [feed, editLang]);
+
+  // NOU: Funcția de resetare a parolei din interiorul dashboard-ului
+  const handleResetPasswordInApp = async () => {
+    if (!confirm("Vrei să îți resetezi parola? Vei primi un email de la noi.")) return;
+    try {
+        await sendPasswordResetEmail(auth, user.email);
+        alert(t.resetSent);
+    } catch (error: any) {
+        alert("Eroare: " + error.message);
+    }
+  };
+
   const handleSaveSettings = async () => {
       if (editPhone.length !== 10) return alert("Numărul de telefon trebuie să aibă 10 cifre!");
       await updateDoc(doc(db, "users", user.id), { phone: editPhone, language: editLang });
-      setUser({ ...user, phone: editPhone, language: editLang }); setShowSettings(false);
+      setUser({ ...user, phone: editPhone, language: editLang }); 
+      setShowSettings(false);
   };
 
   const toggleTheme = () => {
@@ -92,21 +153,35 @@ export default function Dashboard() {
     for (const n of unread) await updateDoc(doc(db, "users", user.id, "notifications", n.id), { read: true });
   };
 
-  const handleRegister = async (item: any) => {
+  const handleDeleteNotif = async (notifId: string) => {
+      await deleteDoc(doc(db, "users", user.id, "notifications", notifId));
+  };
+
+  const handleRegister = async (e: any, item: any) => {
+    e.stopPropagation();
     if (item.type === 'holiday' || item.type === 'exam') return; 
+    
     const isReg = item.attendees?.some((a:any) => a.id === user.id);
     const ref = doc(db, "calendar_events", item.id);
     const newAttendees = isReg ? item.attendees.filter((a:any)=>a.id!==user.id) : [...(item.attendees||[]), {id:user.id, name:user.name, class:user.class, phone:user.phone}];
     if(!isReg && item.maxSpots && newAttendees.length > item.maxSpots) return alert(t.noSpots);
     
     await updateDoc(ref, { attendees: newAttendees });
-    if(!isReg) await addDoc(collection(db, "users", user.id, "notifications"), { type: "join_event", eventTitle: item.title, sentAt: new Date().toISOString(), read: false });
     
-    setSelectedPost((prev: any) => ({ ...prev, attendees: newAttendees }));
+    if(!isReg) {
+        await addDoc(collection(db, "users", user.id, "notifications"), { type: "join_event", eventTitle: item.title, sentAt: new Date().toISOString(), read: false });
+    } else {
+        await addDoc(collection(db, "users", user.id, "notifications"), { title: "Participare Anulată", message: `Te-ai retras de la: ${item.title}`, sentAt: new Date().toISOString(), read: false });
+    }
+    
+    if(selectedPost && selectedPost.id === item.id) {
+        setSelectedPost((prev: any) => ({ ...prev, attendees: newAttendees }));
+    }
     loadFeed();
   };
 
-  const handleLike = async (item: any) => {
+  const handleLike = async (e: any, item: any) => {
+    e.stopPropagation();
     const isLiked = item.likes?.includes(user.id);
     await updateDoc(doc(db, item.col, item.id), { likes: isLiked ? arrayRemove(user.id) : arrayUnion(user.id) });
     loadFeed();
@@ -116,12 +191,10 @@ export default function Dashboard() {
     if (!item.date) return "";
     const startD = new Date(item.date).toLocaleDateString('ro-RO');
     let res = startD;
-    
     if (item.endDate && item.endDate !== item.date && !item.endDate.includes(item.date.split('T')[0])) {
         const endD = new Date(item.endDate).toLocaleDateString('ro-RO');
         if (startD !== endD) res += ` - ${endD}`;
     }
-    
     if (item.hasTime) {
         const t1 = item.startTime || "";
         const t2 = item.endTime ? ` - ${item.endTime}` : "";
@@ -134,15 +207,21 @@ export default function Dashboard() {
 
   if (!user) return null;
 
-  const bgMain = darkMode ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-900";
-  const cardBg = darkMode ? "bg-slate-900/60 border-white/10 shadow-lg" : "bg-white border-slate-200 shadow-md";
+  const bgMain = darkMode ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-800";
+  const cardBg = darkMode ? "bg-slate-900/60 border-white/10 shadow-lg" : "bg-white border-slate-200/60 shadow-xl shadow-slate-200/50";
   const inputBg = darkMode ? "bg-black/50 border-white/10 text-white" : "bg-slate-50 border-slate-200 text-slate-900";
 
-  const filteredFeed = feed.filter(item => {
+  // Folosim translatedFeed in loc de feed normal!
+  const filteredFeed = translatedFeed.filter(item => {
     const sq = searchQuery.toLowerCase();
-    const matchesSearch = item.content?.toLowerCase().includes(sq) || item.title?.toLowerCase().includes(sq);
-    const matchesClass = !item.targetClasses || item.targetClasses.includes("Toată Școala") || item.targetClasses.includes(user.class);
-    return matchesSearch && matchesClass;
+    const targetTitle = item.translatedTitle || item.title || "";
+    const targetContent = item.translatedContent || item.content || "";
+    
+    const matchesSearch = targetContent.toLowerCase().includes(sq) || targetTitle.toLowerCase().includes(sq);
+    const isForUserClass = !item.targetClasses || item.targetClasses.includes("Toată Școala") || item.targetClasses.includes(user.class);
+    
+    if (feedFilter === "class") return matchesSearch && item.targetClasses?.includes(user.class);
+    return matchesSearch && isForUserClass;
   });
 
   return (
@@ -158,6 +237,7 @@ export default function Dashboard() {
             <input placeholder={t.search} className={`hidden md:block flex-1 max-w-sm mx-4 rounded-full px-6 py-2.5 text-sm font-medium outline-none border transition-all focus:border-red-500 ${inputBg}`} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
             
             <div className="flex items-center gap-3 sm:gap-5 flex-wrap justify-end">
+                {isTranslating && <span className="text-xs font-bold text-blue-500 animate-pulse hidden sm:inline">{t.translating}</span>}
                 <button onClick={toggleTheme} className="text-lg sm:text-xl hover:scale-110 transition-transform">{darkMode ? '☀️' : '🌙'}</button>
                 <button onClick={openNotifications} className="relative text-lg sm:text-xl hover:scale-110 transition-transform">
                     🔔 {notifications.some(n=>!n.read) && <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-600 rounded-full border-2 border-slate-900"></span>}
@@ -170,9 +250,14 @@ export default function Dashboard() {
       </nav>
 
       <main className="max-w-6xl mx-auto p-4 pt-28 grid lg:grid-cols-3 gap-8 relative z-10">
-        <div className="lg:col-span-2 space-y-8">
+        <div className="lg:col-span-2 space-y-6">
+          <div className={`flex justify-between items-center p-2 rounded-2xl border backdrop-blur-xl w-fit ${cardBg}`}>
+              <button onClick={() => setFeedFilter("all")} className={`px-4 py-2 text-sm font-bold rounded-xl transition ${feedFilter === 'all' ? 'bg-red-500 text-white shadow-md' : 'opacity-60 hover:opacity-100'}`}>Toată Școala</button>
+              <button onClick={() => setFeedFilter("class")} className={`px-4 py-2 text-sm font-bold rounded-xl transition ${feedFilter === 'class' ? 'bg-red-500 text-white shadow-md' : 'opacity-60 hover:opacity-100'}`}>Clasa Mea</button>
+          </div>
+
           {filteredFeed.map(item => (
-            <div key={item.id} className={`rounded-[2.5rem] overflow-hidden border backdrop-blur-xl transition-all hover:shadow-2xl ${cardBg}`}>
+            <div key={item.id} onClick={() => setSelectedPost(item)} className={`rounded-[2.5rem] overflow-hidden border backdrop-blur-xl transition-all hover:-translate-y-1 hover:shadow-2xl cursor-pointer ${cardBg}`}>
               <div className="p-8">
                 <div className="flex gap-5 items-start mb-6">
                   {item.type === 'activity' && item.date ? (
@@ -184,13 +269,13 @@ export default function Dashboard() {
                      <div className="w-14 h-14 bg-blue-600 text-white rounded-2xl shadow-lg flex items-center justify-center border border-blue-400/30 font-black text-2xl">📢</div>
                   )}
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-black mb-1">{item.title}</h2>
+                    <h2 className="text-xl sm:text-2xl font-black mb-1">{item.translatedTitle || item.title}</h2>
                     {(item.authorName || item.organizers) && <p className="opacity-60 text-xs font-bold uppercase tracking-widest">{item.authorName || item.organizers || t.council}</p>}
                   </div>
                 </div>
                 {item.imageUrl && <div className="h-64 w-full rounded-2xl mb-6 bg-cover bg-center border border-black/10 dark:border-white/10" style={{backgroundImage:`url(${item.imageUrl})`}}></div>}
                 
-                <p className="line-clamp-3 opacity-80 mb-6 text-sm sm:text-base leading-relaxed">{item.content}</p>
+                <p className="line-clamp-3 opacity-80 mb-6 text-sm sm:text-base leading-relaxed">{item.translatedContent || item.content}</p>
                 
                 {item.type === 'activity' && (
                     <div className={`mb-6 p-4 sm:p-5 rounded-2xl border grid gap-4 ${item.location ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'} ${darkMode ? 'bg-black/30 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
@@ -201,13 +286,12 @@ export default function Dashboard() {
 
                 <div className="flex justify-between items-center pt-6 border-t border-black/5 dark:border-white/5">
                   <div className="flex gap-4">
-                      <button onClick={() => handleLike(item)} className="font-bold text-sm flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity">
+                      <button onClick={(e) => handleLike(e, item)} className="font-bold text-sm flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity">
                           <span>{item.likes?.includes(user.id) ? "❤️" : "🤍"}</span> {item.likes?.length || 0}
                       </button>
-                      <button onClick={() => setSelectedPost(item)} className="text-red-500 font-bold text-sm hover:underline">{t.readMore}</button>
                   </div>
                   {item.type === 'activity' && (
-                    <button onClick={() => handleRegister(item)} className={`px-4 sm:px-6 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all shadow-md ${item.attendees?.some((a:any)=>a.id===user.id) ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white' : 'bg-green-600 text-white hover:bg-green-500 border border-green-500'}`}>
+                    <button onClick={(e) => handleRegister(e, item)} className={`px-4 sm:px-6 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all shadow-md ${item.attendees?.some((a:any)=>a.id===user.id) ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white' : 'bg-green-600 text-white hover:bg-green-500 border border-green-500'}`}>
                       {item.attendees?.some((a:any)=>a.id===user.id) ? t.cancel : t.join}
                     </button>
                   )}
@@ -221,13 +305,16 @@ export default function Dashboard() {
             <h3 className="font-black text-xl mb-6">📅 Calendar</h3>
             <div className="space-y-3">
                 {calendarEvents.length === 0 && <p className="opacity-50 text-sm italic py-4">Nu există evenimente viitoare.</p>}
-                {calendarEvents.map(ev => (
+                {calendarEvents.map(ev => {
+                    // Căutăm varianta tradusă a evenimentului (dacă există în feed, sau îi aplicăm un translate basic pe viitor)
+                    // Calendar events are not currently deep-translated to save API, we just show original title
+                    return (
                     <div key={ev.id} onClick={() => setSelectedPost(ev)} className={`cursor-pointer p-4 rounded-2xl border transition-all relative overflow-hidden transform hover:scale-[1.02] hover:shadow-lg ${darkMode ? 'bg-white/5 border-white/5 hover:bg-white/10' : 'bg-slate-50 border-slate-200 hover:bg-white'}`}>
                         <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${ev.type === 'holiday' ? 'bg-yellow-500' : (ev.type === 'exam' ? 'bg-purple-500' : 'bg-blue-500')}`}></div>
                         <div className="font-bold text-sm ml-2 line-clamp-1">{ev.title}</div>
                         <div className="text-[10px] opacity-60 ml-2 mt-1 font-mono">{formatEventDateTime(ev)}</div>
                     </div>
-                ))}
+                )})}
             </div>
         </div>
       </main>
@@ -257,7 +344,13 @@ export default function Dashboard() {
                     <label className="text-[10px] font-black tracking-widest uppercase opacity-50 mb-2 block">{t.phone}</label>
                     <input value={editPhone} onChange={e=>setEditPhone(e.target.value.replace(/\D/g,'').slice(0,10))} className={`w-full p-4 rounded-2xl font-bold outline-none border focus:border-red-500 ${inputBg}`} />
                 </div>
-                <button onClick={handleSaveSettings} className="w-full py-4 mt-4 bg-red-600 text-white rounded-2xl font-black text-lg hover:bg-red-500 transition-colors shadow-lg shadow-red-500/20">{t.save}</button>
+
+                {/* BUTON RESETARE PAROLĂ DIN SETĂRI */}
+                <button onClick={handleResetPasswordInApp} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-black text-sm hover:bg-slate-700 transition-colors shadow-lg border border-white/10">
+                    {t.resetPass}
+                </button>
+
+                <button onClick={handleSaveSettings} className="w-full py-4 mt-2 bg-red-600 text-white rounded-2xl font-black text-lg hover:bg-red-500 transition-colors shadow-lg shadow-red-500/20">{t.save}</button>
             </div>
           </div>
         </div>
@@ -276,10 +369,13 @@ export default function Dashboard() {
                 const notifMsg = n.type === 'welcome' ? t.welcomeMsg : (n.type === 'join_event' ? `${t.joinEventMsg} ${n.eventTitle}` : n.message);
 
                 return (
-                  <div key={n.id} className={`p-5 rounded-2xl border ${darkMode ? 'bg-white/5 border-white/5' : 'bg-slate-100 border-slate-200'}`}>
-                    <p className="font-black text-sm mb-1">{notifTitle}</p>
-                    <p className="text-sm opacity-80">{notifMsg}</p>
-                    <p className="text-[10px] mt-2 font-mono opacity-40">{new Date(n.sentAt).toLocaleString('ro-RO')}</p>
+                  <div key={n.id} className={`p-4 rounded-2xl border flex justify-between items-start gap-4 ${darkMode ? 'bg-white/5 border-white/5' : 'bg-slate-100 border-slate-200'}`}>
+                    <div>
+                        <p className="font-black text-sm mb-1">{notifTitle}</p>
+                        <p className="text-sm opacity-80">{notifMsg}</p>
+                        <p className="text-[10px] mt-2 font-mono opacity-40">{new Date(n.sentAt).toLocaleString('ro-RO')}</p>
+                    </div>
+                    <button onClick={() => handleDeleteNotif(n.id)} className="text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition" title="Șterge">🗑️</button>
                   </div>
                 )
               })}
@@ -290,15 +386,15 @@ export default function Dashboard() {
 
       {/* FULL POST MODAL */}
       {selectedPost && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto custom-scrollbar">
-            <div className={`w-full max-w-2xl rounded-[2.5rem] overflow-hidden border my-auto relative ${cardBg}`}>
-              <button onClick={() => setSelectedPost(null)} className="absolute top-4 right-4 z-10 w-12 h-12 bg-black/50 text-white rounded-full font-black backdrop-blur-md border border-white/20">✕</button>
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto custom-scrollbar" onClick={() => setSelectedPost(null)}>
+            <div className={`w-full max-w-2xl rounded-[2.5rem] overflow-hidden border my-auto relative ${cardBg}`} onClick={e => e.stopPropagation()}>
+              <button onClick={() => setSelectedPost(null)} className="absolute top-4 right-4 z-10 w-12 h-12 bg-black/50 text-white rounded-full font-black backdrop-blur-md border border-white/20 hover:bg-black/70 transition">✕</button>
               {selectedPost.imageUrl && <div className="h-48 sm:h-72 w-full bg-cover bg-center" style={{backgroundImage:`url(${selectedPost.imageUrl})`}}></div>}
-              <div className="p-6 sm:p-10">
-                
+              <div className="p-6 sm:p-10 relative">
+
                 <div className="mb-4">
                      <span className={`text-[10px] uppercase font-black px-3 py-1 rounded-full ${
-                         selectedPost.type === 'holiday' ? 'bg-yellow-500/20 text-yellow-500' : 
+                         selectedPost.type === 'holiday' ? 'bg-yellow-500/20 text-yellow-600' : 
                          selectedPost.type === 'exam' ? 'bg-purple-500/20 text-purple-500' : 
                          (selectedPost.type === 'activity' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500')
                      }`}> 
@@ -306,8 +402,8 @@ export default function Dashboard() {
                      </span>
                 </div>
 
-                <h2 className="text-2xl sm:text-3xl font-black mb-6">{selectedPost.title}</h2>
-                <p className="text-base sm:text-lg leading-relaxed opacity-90 whitespace-pre-wrap mb-8">{selectedPost.content}</p>
+                <h2 className="text-2xl sm:text-3xl font-black mb-6">{selectedPost.translatedTitle || selectedPost.title}</h2>
+                <p className="text-base sm:text-lg leading-relaxed opacity-90 whitespace-pre-wrap mb-8">{selectedPost.translatedContent || selectedPost.content}</p>
                 
                 {(selectedPost.type === 'activity' || selectedPost.type === 'holiday' || selectedPost.type === 'exam') && (
                     <div className={`mb-6 p-4 sm:p-5 rounded-2xl border grid gap-4 ${selectedPost.location ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'} ${darkMode ? 'bg-black/30 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
@@ -317,7 +413,7 @@ export default function Dashboard() {
                 )}
 
                 {selectedPost.type === 'activity' && (
-                  <button onClick={() => handleRegister(selectedPost)} className={`w-full py-4 rounded-2xl font-black text-lg shadow-xl transition-colors ${selectedPost.attendees?.some((a:any)=>a.id===user.id) ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white' : 'bg-green-600 text-white hover:bg-green-500'}`}>
+                  <button onClick={(e) => handleRegister(e, selectedPost)} className={`w-full py-4 rounded-2xl font-black text-lg shadow-xl transition-colors ${selectedPost.attendees?.some((a:any)=>a.id===user.id) ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white' : 'bg-green-600 text-white hover:bg-green-500'}`}>
                     {selectedPost.attendees?.some((a:any)=>a.id===user.id) ? t.cancel : t.join}
                   </button>
                 )}

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { auth, db } from "../lib/firebase";
 import { useRouter } from "next/navigation";
-import { doc, getDoc, collection, addDoc, setDoc, getDocs, query, orderBy, deleteDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, collection, addDoc, setDoc, getDocs, deleteDoc, updateDoc } from "firebase/firestore";
 import { SCHOOL_CLASSES } from "../lib/constants";
 
 export default function AdminPanel() {
@@ -22,7 +22,7 @@ export default function AdminPanel() {
   const [notifBody, setNotifBody] = useState("");
   const [selectedClassNotif, setSelectedClassNotif] = useState("Toată Școala");
 
-  const [eventType, setEventType] = useState("activity"); // 'activity', 'holiday', 'exam'
+  const [eventType, setEventType] = useState("activity"); 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [hasTime, setHasTime] = useState(false);
@@ -68,6 +68,16 @@ export default function AdminPanel() {
     setPosts(allItems);
   };
 
+  const getClientIp = async () => {
+      try {
+          const res = await fetch('https://api.ipify.org?format=json');
+          const data = await res.json();
+          return data.ip;
+      } catch (err) {
+          return "IP_NOT_FOUND";
+      }
+  };
+
   const handleDelete = async (id: string, col: string) => {
     if(!confirm("Ești sigur că vrei să ștergi definitiv?")) return;
     await deleteDoc(doc(db, col, id));
@@ -78,6 +88,31 @@ export default function AdminPanel() {
     await updateDoc(doc(db, "users", uid), { class: newClass });
     alert("✅ Clasa a fost schimbată!");
     fetchData();
+  };
+
+  const handlePromoteStudents = async () => {
+      if(!confirm("⚠️ EȘTI SIGUR? Această acțiune va avansa toți elevii cu un an (ex: 10B devine 11B). Cei din clasa a 12-a vor primi tag-ul 'Absolvent'.")) return;
+      
+      let count = 0;
+      for (const u of users) {
+          if (!u.class || u.class === 'Absolvent') continue;
+          
+          const match = u.class.match(/(\d+)(.*)/);
+          if (match) {
+              const currentGrade = parseInt(match[1]);
+              const letters = match[2];
+              
+              if (currentGrade === 12) {
+                  await updateDoc(doc(db, "users", u.id), { class: "Absolvent" });
+              } else if (currentGrade >= 5 && currentGrade < 12) {
+                  const nextGrade = currentGrade + 1;
+                  await updateDoc(doc(db, "users", u.id), { class: `${nextGrade}${letters}` });
+              }
+              count++;
+          }
+      }
+      alert(`✅ Anul școlar a fost avansat pentru ${count} elevi!`);
+      fetchData();
   };
 
   const handleSendNotif = async () => {
@@ -104,12 +139,23 @@ export default function AdminPanel() {
 
   const handleSavePost = async (e: React.FormEvent) => {
     e.preventDefault();
-    await addDoc(collection(db, "news"), { type: "official_news", title, content, imageUrl, authorName: authorName || "Consiliul Elevilor", targetClasses: selectedClasses.length === 0 ? ["Toată Școala"] : selectedClasses, postedAt: new Date().toISOString(), likes: [] });
+    const ip = await getClientIp();
+
+    await addDoc(collection(db, "news"), { 
+        type: "official_news", title, content, imageUrl, 
+        authorName: authorName || "Consiliul Elevilor", 
+        targetClasses: selectedClasses.length === 0 ? ["Toată Școala"] : selectedClasses, 
+        postedAt: new Date().toISOString(), likes: [],
+        uploaderIp: ip
+    });
+
     alert("✅ Postare Publicată!"); setTitle(""); setContent(""); setImageUrl(""); setAuthorName(""); setSelectedClasses([]); fetchData();
   };
 
   const handleSaveActivity = async (e: React.FormEvent) => {
     e.preventDefault();
+    const ip = await getClientIp();
+
     const finalDateISO = startDate ? (hasTime && startTime ? `${startDate}T${startTime}` : `${startDate}T00:00:00`) : new Date().toISOString();
     const finalEndDateISO = endDate ? (hasTime && endTime ? `${endDate}T${endTime}` : `${endDate}T00:00:00`) : finalDateISO;
 
@@ -117,7 +163,8 @@ export default function AdminPanel() {
         type: eventType, title, content, imageUrl, 
         date: finalDateISO, endDate: finalEndDateISO, hasTime, startTime, endTime,
         targetClasses: selectedClasses.length === 0 ? ["Toată Școala"] : selectedClasses, 
-        postedAt: new Date().toISOString(), likes: []
+        postedAt: new Date().toISOString(), likes: [],
+        uploaderIp: ip
     };
 
     if (eventType === 'activity') {
@@ -136,16 +183,17 @@ export default function AdminPanel() {
 
   const handleUpdateEditingPost = async () => {
       try {
-          const ref = doc(db, editingPost.col, editingPost.id);
+          const refDoc = doc(db, editingPost.col, editingPost.id);
           const dataToUpdate = {
               title: editingPost.title,
               content: editingPost.content,
+              imageUrl: editingPost.imageUrl || ""
           };
           if (editingPost.col === 'calendar_events' && editingPost.type === 'activity') {
               (dataToUpdate as any).location = editingPost.location;
               (dataToUpdate as any).maxSpots = editingPost.maxSpots;
           }
-          await updateDoc(ref, dataToUpdate);
+          await updateDoc(refDoc, dataToUpdate);
           alert("✅ Postare actualizată!");
           setEditingPost(null);
           fetchData();
@@ -185,7 +233,7 @@ export default function AdminPanel() {
 
   const toggleClass = (c: string) => setSelectedClasses(prev => prev.includes(c) ? prev.filter(x=>x!==c) : [...prev, c]);
 
-  const bgMain = darkMode ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-900";
+  const bgMain = darkMode ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-800";
   const cardBg = darkMode ? "bg-slate-900/80 border-white/10 shadow-2xl" : "bg-white border-slate-200 shadow-xl";
   const inputBg = darkMode ? "bg-black/50 border-white/10 text-white placeholder-gray-500" : "bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-500";
 
@@ -228,6 +276,7 @@ export default function AdminPanel() {
                                     {p.title} <span className={`text-xs font-normal opacity-60`}>{p.authorName || p.organizers ? `(${p.authorName || p.organizers})` : ''}</span>
                                 </div>
                                 <div className={`text-xs line-clamp-1 opacity-60`}>{p.content}</div>
+                                {p.uploaderIp && <div className="text-[10px] font-mono opacity-30 mt-1">IP: {p.uploaderIp}</div>}
                             </div>
                             <div className="flex gap-2 flex-wrap justify-end">
                                 {p.type === 'activity' && (
@@ -261,11 +310,16 @@ export default function AdminPanel() {
                             <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Conținut</label>
                             <textarea className={`w-full p-4 rounded-2xl outline-none border h-32 resize-none ${inputBg}`} value={editingPost.content} onChange={e=>setEditingPost({...editingPost, content: e.target.value})} />
                         </div>
+                        
+                        <div>
+                            <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Link Imagine Copertă (URL)</label>
+                            <input className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={editingPost.imageUrl || ""} onChange={e=>setEditingPost({...editingPost, imageUrl: e.target.value})} />
+                        </div>
 
                         {editingPost.col === 'calendar_events' && editingPost.type === 'activity' && (
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Locație (dacă e cazul)</label>
+                                    <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Locație</label>
                                     <input className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={editingPost.location || ""} onChange={e=>setEditingPost({...editingPost, location: e.target.value})} />
                                 </div>
                                 <div>
@@ -311,7 +365,11 @@ export default function AdminPanel() {
 
         {activeTab === "users" && (
           <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
-            <h2 className="text-2xl font-black mb-4">👥 Gestiune Elevi</h2>
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+                <h2 className="text-2xl font-black">👥 Gestiune Elevi</h2>
+                <button onClick={handlePromoteStudents} className="bg-purple-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-purple-500 transition shadow-lg text-sm w-full sm:w-auto">🎓 Avansare An Școlar</button>
+            </div>
+            
             <input placeholder="Caută elev după nume sau email..." className={`w-full p-4 mb-6 rounded-2xl outline-none border focus:border-red-500 transition-colors ${inputBg}`} value={userSearch} onChange={e => setUserSearch(e.target.value)} />
 
             <div className="grid gap-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
@@ -324,6 +382,7 @@ export default function AdminPanel() {
                   <div className="flex items-center gap-3">
                     <select value={u.class} onChange={(e) => handleUpdateUserClass(u.id, e.target.value)} className={`px-4 py-2.5 rounded-xl font-black text-xs outline-none border cursor-pointer ${inputBg}`}>
                       <option value="" className="text-black bg-white">Alege</option>
+                      <option value="Absolvent" className="text-black bg-white">Absolvent</option>
                       {SCHOOL_CLASSES.map(c => <option key={c} value={c} className="text-black bg-white">{c}</option>)}
                     </select>
                     <button onClick={() => handleDelete(u.id, 'users')} className="bg-red-500/10 text-red-500 px-4 py-2.5 rounded-xl font-bold text-xs hover:bg-red-500 hover:text-white transition">Șterge</button>
@@ -345,10 +404,18 @@ export default function AdminPanel() {
                     <input placeholder="Autor (ex: Director)" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={authorName} onChange={e=>setAuthorName(e.target.value)} />
                 </div>
                 <textarea placeholder="Conținutul anunțului..." className={`w-full p-4 rounded-2xl outline-none border h-32 resize-none mb-4 ${inputBg}`} value={content} onChange={e=>setContent(e.target.value)} required />
-                <input placeholder="Link Imagine Copertă (Opțional)" className={`w-full p-4 rounded-2xl outline-none border mb-6 ${inputBg}`} value={imageUrl} onChange={e=>setImageUrl(e.target.value)} />
+                
+                <div className="mb-6">
+                    <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Imagine Copertă (URL Extern)</label>
+                    <input placeholder="Ex: https://imgur.com/poza.jpg" value={imageUrl} onChange={e=>setImageUrl(e.target.value)} className={`w-full p-4 rounded-xl border ${inputBg}`} />
+                </div>
+
                 <p className="text-[10px] font-black tracking-widest text-red-500 uppercase mb-3">Afișează Doar Pentru (Lasă gol pt toată școala)</p>
                 <div className="flex flex-wrap gap-2 mb-6">{SCHOOL_CLASSES.map(c => <button key={c} type="button" onClick={() => toggleClass(c)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${selectedClasses.includes(c) ? 'bg-red-600 border-red-500 text-white' : `${darkMode?'bg-white/5 border-white/10 text-gray-400':'bg-slate-100 border-slate-200 text-slate-600'}`}`}>{c}</button>)}</div>
-                <button className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-lg hover:bg-red-500 transition">Publică Anunțul</button>
+                
+                <button className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-lg hover:bg-red-500 transition">
+                    Publică Anunțul
+                </button>
             </form>
         )}
 
@@ -372,6 +439,11 @@ export default function AdminPanel() {
                 
                 <textarea placeholder="Detalii suplimentare..." className={`w-full p-4 rounded-2xl outline-none border h-24 resize-none mb-4 ${inputBg}`} value={content} onChange={e=>setContent(e.target.value)} required />
                 
+                <div className="mb-6">
+                    <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Imagine (URL Extern)</label>
+                    <input placeholder="Ex: https://imgur.com/poza.jpg" value={imageUrl} onChange={e=>setImageUrl(e.target.value)} className={`w-full p-4 rounded-xl border ${inputBg}`} />
+                </div>
+
                 <div className="grid sm:grid-cols-2 gap-4 mb-4">
                     <div>
                         <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Din data</label>
