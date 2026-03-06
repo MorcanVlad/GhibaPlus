@@ -5,7 +5,6 @@ import { sendPasswordResetEmail } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { doc, getDoc, updateDoc, collection, getDocs, arrayUnion, arrayRemove, orderBy, onSnapshot, addDoc, query, deleteDoc } from "firebase/firestore";
 
-// Traducerile statice pentru interfață (acum includ și Toată Școala / Clasa Mea)
 const TRANSLATIONS: any = {
   ro: { search: "Caută...", settings: "⚙️ Setări", admin: "ADMIN", welcomeTitle: "Bine ai venit!", welcomeMsg: "Ne bucurăm să te avem pe GhibaPlus.", joinEventTitle: "Înscriere Confirmată ✅", joinEventMsg: "Te-ai înscris cu succes la:", notif: "Notificări", noNotif: "Nicio notificare.", dateTime: "DATA / ORA", location: "LOCAȚIE", join: "Particip ✅", cancel: "Anulează", readMore: "📖 Citește mai mult", lang: "Limba Interfeței", class: "Clasa Ta (Blocat)", phone: "Număr de Telefon", save: "Salvează Setările", council: "Consiliul Elevilor", noSpots: "Locuri epuizate!", translating: "Se traduce...", resetPass: "🔑 Trimite link resetare parolă", resetSent: "Email-ul a fost trimis! Verifică Inbox-ul.", allSchool: "Toată Școala", myClass: "Clasa Mea" },
   en: { search: "Search...", settings: "⚙️ Settings", admin: "ADMIN", welcomeTitle: "Welcome!", welcomeMsg: "Glad to have you on GhibaPlus.", joinEventTitle: "Registration Confirmed ✅", joinEventMsg: "Successfully joined:", notif: "Notifications", noNotif: "No notifications.", dateTime: "DATE / TIME", location: "LOCATION", join: "Join ✅", cancel: "Cancel", readMore: "📖 Read More", lang: "Interface Language", class: "Your Class (Locked)", phone: "Phone Number", save: "Save Settings", council: "Student Council", noSpots: "No spots left!", translating: "Translating...", resetPass: "🔑 Send password reset link", resetSent: "Email sent! Check your Inbox.", allSchool: "Whole School", myClass: "My Class" },
@@ -21,7 +20,6 @@ export default function Dashboard() {
   const [feed, setFeed] = useState<any[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
   
-  // State-uri pentru listele traduse
   const [translatedFeed, setTranslatedFeed] = useState<any[]>([]);
   const [translatedCalendar, setTranslatedCalendar] = useState<any[]>([]);
   
@@ -36,9 +34,7 @@ export default function Dashboard() {
   const [feedFilter, setFeedFilter] = useState("all"); 
   const [isTranslating, setIsTranslating] = useState(false);
   
-  // MEMORIA CACHE PENTRU TRADUCERI (Salvează interogările API)
   const translationCache = useRef(new Map());
-
   const router = useRouter();
 
   useEffect(() => {
@@ -82,98 +78,68 @@ export default function Dashboard() {
 
   const t = TRANSLATIONS[editLang] || TRANSLATIONS["ro"];
 
-  // Funcția principală de traducere, acum folosește memoria CACHE
   const translateText = async (text: string, targetLang: string) => {
     if (!text || targetLang === 'ro') return text;
-    
     const cacheKey = `${targetLang}_${text}`;
-    // Dacă am tradus deja acest text în această limbă, dă-l din memorie (fără request)
-    if (translationCache.current.has(cacheKey)) {
-        return translationCache.current.get(cacheKey);
-    }
+    if (translationCache.current.has(cacheKey)) return translationCache.current.get(cacheKey);
 
     try {
       const res = await fetch(`https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_TRANSLATE_API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // format: 'text' previne problemele cu caracterele ciudate din baza de date
         body: JSON.stringify({ q: text, target: targetLang, source: 'ro', format: 'text' })
       });
       const data = await res.json();
-      
-      if (data.error) {
-        console.error("API Error:", data.error.message);
-        return text; 
-      }
-      
+      if (data.error) return text; 
       const translated = data.data.translations[0].translatedText;
-      // Salvăm în memorie pentru data viitoare
       translationCache.current.set(cacheKey, translated);
       return translated;
     } catch (error) {
-      console.error("Connection Error:", error);
       return text;
     }
   };
 
-  // Acest efect se rulează de fiecare dată când feed-ul sau limba se schimbă
   useEffect(() => {
     const translateWholePage = async () => {
-      // Dacă e în română, afișăm direct
       if (editLang === 'ro' || (feed.length === 0 && calendarEvents.length === 0)) {
-        setTranslatedFeed(feed);
-        setTranslatedCalendar(calendarEvents);
-        return;
+        setTranslatedFeed(feed); setTranslatedCalendar(calendarEvents); return;
       }
       
-      // Verificăm dacă avem postări noi care nu sunt în cache, ca să nu afișăm textul "Translating..." la fiecare Like
       let needsApi = false;
       for (const item of [...feed, ...calendarEvents]) {
-          if (!translationCache.current.has(`${editLang}_${item.title}`) || 
-              (item.content && !translationCache.current.has(`${editLang}_${item.content}`))) {
+          if (!translationCache.current.has(`${editLang}_${item.title}`) || (item.content && !translationCache.current.has(`${editLang}_${item.content}`))) {
               needsApi = true; break;
           }
       }
 
       if (needsApi) setIsTranslating(true);
       
-      // Traducem Feed-ul
       const newFeed = await Promise.all(feed.map(async (item) => {
         const tTitle = await translateText(item.title, editLang);
         const tContent = item.content ? await translateText(item.content, editLang) : "";
         return { ...item, translatedTitle: tTitle, translatedContent: tContent };
       }));
 
-      // Traducem Calendarul
       const newCal = await Promise.all(calendarEvents.map(async (item) => {
         const tTitle = await translateText(item.title, editLang);
         return { ...item, translatedTitle: tTitle };
       }));
       
-      setTranslatedFeed(newFeed);
-      setTranslatedCalendar(newCal);
+      setTranslatedFeed(newFeed); setTranslatedCalendar(newCal);
       if (needsApi) setIsTranslating(false);
     };
-
     translateWholePage();
   }, [feed, calendarEvents, editLang]);
 
-  // RESETARE PAROLĂ
   const handleResetPasswordInApp = async () => {
     if (!confirm("Vrei să îți resetezi parola? Vei primi un email de la noi (verifică și Spam).")) return;
-    try {
-        await sendPasswordResetEmail(auth, user.email);
-        alert(t.resetSent);
-    } catch (error: any) {
-        alert("Eroare la resetare: " + error.message);
-    }
+    try { await sendPasswordResetEmail(auth, user.email); alert(t.resetSent); } catch (error: any) { alert("Eroare la resetare: " + error.message); }
   };
 
   const handleSaveSettings = async () => {
       if (editPhone.length !== 10) return alert("Numărul de telefon trebuie să aibă 10 cifre!");
       await updateDoc(doc(db, "users", user.id), { phone: editPhone, language: editLang });
-      setUser({ ...user, phone: editPhone, language: editLang }); 
-      setShowSettings(false);
+      setUser({ ...user, phone: editPhone, language: editLang }); setShowSettings(false);
   };
 
   const toggleTheme = () => {
@@ -202,15 +168,10 @@ export default function Dashboard() {
     
     await updateDoc(ref, { attendees: newAttendees });
     
-    if(!isReg) {
-        await addDoc(collection(db, "users", user.id, "notifications"), { type: "join_event", eventTitle: item.title, sentAt: new Date().toISOString(), read: false });
-    } else {
-        await addDoc(collection(db, "users", user.id, "notifications"), { title: "Participare Anulată", message: `Te-ai retras de la: ${item.title}`, sentAt: new Date().toISOString(), read: false });
-    }
+    if(!isReg) await addDoc(collection(db, "users", user.id, "notifications"), { type: "join_event", eventTitle: item.title, sentAt: new Date().toISOString(), read: false });
+    else await addDoc(collection(db, "users", user.id, "notifications"), { title: "Participare Anulată", message: `Te-ai retras de la: ${item.title}`, sentAt: new Date().toISOString(), read: false });
     
-    if(selectedPost && selectedPost.id === item.id) {
-        setSelectedPost((prev: any) => ({ ...prev, attendees: newAttendees }));
-    }
+    if(selectedPost && selectedPost.id === item.id) setSelectedPost((prev: any) => ({ ...prev, attendees: newAttendees }));
     loadFeed();
   };
 
@@ -218,13 +179,8 @@ export default function Dashboard() {
     e.stopPropagation();
     const isLiked = item.likes?.includes(user.id);
     await updateDoc(doc(db, item.col, item.id), { likes: isLiked ? arrayRemove(user.id) : arrayUnion(user.id) });
-    
-    // Actualizăm selectedPost imediat, ca inima să se coloreze pe loc dacă modalul e deschis
     if (selectedPost && selectedPost.id === item.id) {
-        setSelectedPost((prev:any) => ({
-            ...prev,
-            likes: isLiked ? prev.likes.filter((id:string)=>id!==user.id) : [...(prev.likes||[]), user.id]
-        }));
+        setSelectedPost((prev:any) => ({ ...prev, likes: isLiked ? prev.likes.filter((id:string)=>id!==user.id) : [...(prev.likes||[]), user.id] }));
     }
     loadFeed();
   };
@@ -251,17 +207,14 @@ export default function Dashboard() {
 
   const bgMain = darkMode ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-800";
   const cardBg = darkMode ? "bg-slate-900/60 border-white/10 shadow-lg" : "bg-white border-slate-200/60 shadow-xl shadow-slate-200/50";
-  const inputBg = darkMode ? "bg-black/50 border-white/10 text-white" : "bg-slate-50 border-slate-200 text-slate-900";
+  const inputBg = darkMode ? "bg-black/50 border-white/10 text-white focus:bg-black/70" : "bg-slate-100 border-slate-200 text-slate-900 focus:bg-white";
 
-  // Filtrare aplicată pe feed-ul tradus
   const filteredFeed = translatedFeed.filter(item => {
     const sq = searchQuery.toLowerCase();
     const targetTitle = item.translatedTitle || item.title || "";
     const targetContent = item.translatedContent || item.content || "";
-    
     const matchesSearch = targetContent.toLowerCase().includes(sq) || targetTitle.toLowerCase().includes(sq);
     const isForUserClass = !item.targetClasses || item.targetClasses.includes("Toată Școala") || item.targetClasses.includes(user.class);
-    
     if (feedFilter === "class") return matchesSearch && item.targetClasses?.includes(user.class);
     return matchesSearch && isForUserClass;
   });
@@ -274,42 +227,75 @@ export default function Dashboard() {
       </div>
 
       <nav className={`fixed top-0 w-full z-40 px-4 py-4 backdrop-blur-2xl border-b flex justify-between items-center transition-all ${darkMode ? 'bg-slate-950/80 border-white/10' : 'bg-white/80 border-slate-200'}`}>
-        <div className="max-w-6xl mx-auto w-full flex justify-between items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-black">Ghiba<span className="text-red-500">+</span></h1>
-            <input placeholder={t.search} className={`hidden md:block flex-1 max-w-sm mx-4 rounded-full px-6 py-2.5 text-sm font-medium outline-none border transition-all focus:border-red-500 ${inputBg}`} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+        <div className="max-w-6xl mx-auto w-full flex justify-between items-center gap-4">
+            {/* Logo */}
+            <h1 className="text-xl sm:text-2xl font-black shrink-0">Ghiba<span className="text-red-500">+</span></h1>
             
-            <div className="flex items-center gap-3 sm:gap-5 flex-wrap justify-end">
-                {isTranslating && <span className="text-[10px] sm:text-xs font-bold text-blue-500 animate-pulse bg-blue-500/10 px-2 py-1 rounded-full hidden sm:inline">{t.translating}</span>}
-                <button onClick={toggleTheme} className="text-lg sm:text-xl hover:scale-110 transition-transform">{darkMode ? '☀️' : '🌙'}</button>
-                <button onClick={openNotifications} className="relative text-lg sm:text-xl hover:scale-110 transition-transform">
-                    🔔 {notifications.some(n=>!n.read) && <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-600 rounded-full border-2 border-slate-900"></span>}
+            {/* Căutare Animată (Expanding Search Bar) */}
+            <div className="relative group hidden md:flex flex-1 max-w-lg justify-end ml-4 mr-2">
+                <div className="relative w-48 focus-within:w-full transition-all duration-500 ease-out">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 opacity-40 transition-opacity group-focus-within:opacity-100 group-focus-within:text-red-500">🔍</span>
+                    <input 
+                      placeholder={t.search} 
+                      className={`w-full rounded-full pl-12 pr-6 py-2.5 text-sm font-medium outline-none border transition-all duration-300 shadow-sm focus:border-red-500 focus:ring-4 focus:ring-red-500/20 ${inputBg}`} 
+                      value={searchQuery} 
+                      onChange={e => setSearchQuery(e.target.value)} 
+                    />
+                </div>
+            </div>
+            
+            {/* Grupul modern de Setări (Glassmorphism Pill) */}
+            <div className={`flex items-center gap-1 sm:gap-2 p-1.5 rounded-full border shadow-sm transition-all ${darkMode ? 'bg-white/5 border-white/10' : 'bg-slate-100 border-slate-200'}`}>
+                {isTranslating && <span className="text-[10px] font-bold text-blue-500 animate-pulse bg-blue-500/10 px-3 py-1.5 rounded-full hidden lg:inline mr-2">{t.translating}</span>}
+                
+                {/* Theme Toggle */}
+                <button onClick={toggleTheme} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-transform hover:rotate-[15deg] hover:scale-110">
+                    {darkMode ? '☀️' : '🌙'}
                 </button>
-                <button onClick={() => setShowSettings(true)} className="font-bold text-xs sm:text-sm opacity-70 hover:opacity-100">⚙️</button>
-                {user.role === 'admin' && <button onClick={() => router.push('/admin')} className="bg-red-600 text-white px-3 py-1.5 rounded-xl text-[10px] sm:text-xs font-black shadow-lg shadow-red-500/20">ADMIN</button>}
-                <button onClick={() => auth.signOut()} className="text-[10px] sm:text-xs font-bold opacity-70 hover:text-red-500">Ieșire</button>
+                
+                {/* Notificari */}
+                <button onClick={openNotifications} className="relative w-9 h-9 flex items-center justify-center rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-transform hover:scale-110">
+                    🔔 {notifications.some(n=>!n.read) && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-600 rounded-full border-2 border-white dark:border-slate-800 animate-pulse"></span>}
+                </button>
+                
+                {/* Setari */}
+                <button onClick={() => setShowSettings(true)} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-transform duration-300 hover:rotate-90 origin-center">
+                    ⚙️
+                </button>
+
+                {/* Butoane Actiuni (Admin & Iesire) */}
+                <div className="flex items-center gap-2 pl-2 border-l border-black/10 dark:border-white/10 ml-1">
+                    {user.role === 'admin' && (
+                        <button onClick={() => router.push('/admin')} className="bg-gradient-to-r from-red-600 to-rose-500 text-white px-3 sm:px-4 py-1.5 rounded-full text-[10px] sm:text-xs font-black shadow-lg shadow-red-500/20 hover:shadow-red-500/40 hover:-translate-y-0.5 transition-all">
+                            ADMIN
+                        </button>
+                    )}
+                    <button onClick={() => auth.signOut()} className="text-[10px] sm:text-xs font-bold opacity-60 hover:opacity-100 hover:text-red-500 transition-colors pr-3">
+                        Ieșire
+                    </button>
+                </div>
             </div>
         </div>
       </nav>
 
       <main className="max-w-6xl mx-auto p-4 pt-28 grid lg:grid-cols-3 gap-8 relative z-10">
         <div className="lg:col-span-2 space-y-6">
-          <div className={`flex justify-between items-center p-2 rounded-2xl border backdrop-blur-xl w-fit ${cardBg}`}>
-              {/* Butoanele de feed sunt acum traduse */}
-              <button onClick={() => setFeedFilter("all")} className={`px-4 py-2 text-sm font-bold rounded-xl transition ${feedFilter === 'all' ? 'bg-red-500 text-white shadow-md' : 'opacity-60 hover:opacity-100'}`}>{t.allSchool}</button>
-              <button onClick={() => setFeedFilter("class")} className={`px-4 py-2 text-sm font-bold rounded-xl transition ${feedFilter === 'class' ? 'bg-red-500 text-white shadow-md' : 'opacity-60 hover:opacity-100'}`}>{t.myClass}</button>
+          <div className={`flex justify-between items-center p-1.5 rounded-2xl border backdrop-blur-xl w-fit ${cardBg}`}>
+              <button onClick={() => setFeedFilter("all")} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all duration-300 ${feedFilter === 'all' ? 'bg-red-500 text-white shadow-md' : 'opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}>{t.allSchool}</button>
+              <button onClick={() => setFeedFilter("class")} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all duration-300 ${feedFilter === 'class' ? 'bg-red-500 text-white shadow-md' : 'opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}>{t.myClass}</button>
           </div>
 
           {filteredFeed.map(item => (
-            <div key={item.id} onClick={() => setSelectedPost(item)} className={`rounded-[2.5rem] overflow-hidden border backdrop-blur-xl transition-all hover:-translate-y-1 hover:shadow-2xl cursor-pointer ${cardBg}`}>
+            <div key={item.id} onClick={() => setSelectedPost(item)} className={`rounded-[2.5rem] overflow-hidden border backdrop-blur-xl transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl cursor-pointer ${cardBg}`}>
               <div className="p-8">
                 <div className="flex gap-5 items-start mb-6">
                   {item.type === 'activity' && item.date ? (
-                     <div className={`text-white px-5 py-3 rounded-2xl flex flex-col items-center shadow-lg border bg-gradient-to-br from-red-500 to-rose-600 border-red-400/30`}>
+                     <div className={`text-white px-5 py-3 rounded-2xl flex flex-col items-center shadow-lg border bg-gradient-to-br from-red-500 to-rose-600 border-red-400/30 transform transition-transform group-hover:scale-105`}>
                         <span className="text-2xl font-black leading-none mb-1">{new Date(item.date).getDate()}</span>
                         <span className="text-[10px] font-black uppercase">{new Date(item.date).toLocaleString(editLang, {month:'short'})}</span>
                      </div>
                   ) : (
-                     <div className="w-14 h-14 bg-blue-600 text-white rounded-2xl shadow-lg flex items-center justify-center border border-blue-400/30 font-black text-2xl">📢</div>
+                     <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-2xl shadow-lg flex items-center justify-center border border-blue-400/30 font-black text-2xl transform transition-transform group-hover:scale-105">📢</div>
                   )}
                   <div>
                     <h2 className="text-xl sm:text-2xl font-black mb-1">{item.translatedTitle || item.title}</h2>
@@ -329,12 +315,12 @@ export default function Dashboard() {
 
                 <div className="flex justify-between items-center pt-6 border-t border-black/5 dark:border-white/5">
                   <div className="flex gap-4">
-                      <button onClick={(e) => handleLike(e, item)} className="font-bold text-sm flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity">
+                      <button onClick={(e) => handleLike(e, item)} className={`font-bold text-sm flex items-center gap-2 transition-all ${item.likes?.includes(user.id) ? 'text-red-500 scale-110' : 'opacity-70 hover:opacity-100 hover:scale-110'}`}>
                           <span>{item.likes?.includes(user.id) ? "❤️" : "🤍"}</span> {item.likes?.length || 0}
                       </button>
                   </div>
                   {item.type === 'activity' && (
-                    <button onClick={(e) => handleRegister(e, item)} className={`px-4 sm:px-6 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all shadow-md ${item.attendees?.some((a:any)=>a.id===user.id) ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white' : 'bg-green-600 text-white hover:bg-green-500 border border-green-500'}`}>
+                    <button onClick={(e) => handleRegister(e, item)} className={`px-4 sm:px-6 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all shadow-md ${item.attendees?.some((a:any)=>a.id===user.id) ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white' : 'bg-green-600 text-white hover:bg-green-500 hover:-translate-y-0.5 border border-green-500'}`}>
                       {item.attendees?.some((a:any)=>a.id===user.id) ? t.cancel : t.join}
                     </button>
                   )}
@@ -349,7 +335,7 @@ export default function Dashboard() {
             <div className="space-y-3">
                 {translatedCalendar.length === 0 && <p className="opacity-50 text-sm italic py-4">Nu există evenimente viitoare.</p>}
                 {translatedCalendar.map(ev => (
-                    <div key={ev.id} onClick={() => setSelectedPost(ev)} className={`cursor-pointer p-4 rounded-2xl border transition-all relative overflow-hidden transform hover:scale-[1.02] hover:shadow-lg ${darkMode ? 'bg-white/5 border-white/5 hover:bg-white/10' : 'bg-slate-50 border-slate-200 hover:bg-white'}`}>
+                    <div key={ev.id} onClick={() => setSelectedPost(ev)} className={`cursor-pointer p-4 rounded-2xl border transition-all relative overflow-hidden transform hover:-translate-y-1 hover:shadow-md ${darkMode ? 'bg-white/5 border-white/5 hover:bg-white/10' : 'bg-slate-50 border-slate-200 hover:bg-white'}`}>
                         <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${ev.type === 'holiday' ? 'bg-yellow-500' : (ev.type === 'exam' ? 'bg-purple-500' : 'bg-blue-500')}`}></div>
                         <div className="font-bold text-sm ml-2 line-clamp-1">{ev.translatedTitle || ev.title}</div>
                         <div className="text-[10px] opacity-60 ml-2 mt-1 font-mono">{formatEventDateTime(ev)}</div>
@@ -361,14 +347,14 @@ export default function Dashboard() {
 
       {/* MODAL SETARI */}
       {showSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className={`w-full max-w-lg p-10 rounded-[2.5rem] border shadow-2xl relative ${cardBg}`}>
-            <button onClick={() => setShowSettings(false)} className="absolute top-6 right-6 w-10 h-10 bg-black/10 dark:bg-white/10 rounded-full font-bold">✕</button>
-            <h2 className="text-2xl font-black mb-8">{t.settings}</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className={`w-full max-w-lg p-10 rounded-[2.5rem] border shadow-2xl relative transform transition-all ${cardBg}`}>
+            <button onClick={() => setShowSettings(false)} className="absolute top-6 right-6 w-10 h-10 bg-black/10 dark:bg-white/10 rounded-full font-bold hover:rotate-90 transition-transform">✕</button>
+            <h2 className="text-2xl font-black mb-8 flex items-center gap-2">⚙️ {t.settings}</h2>
             <div className="space-y-6">
                 <div>
                     <label className="text-[10px] font-black tracking-widest uppercase opacity-50 mb-2 block">{t.lang}</label>
-                    <select value={editLang} onChange={e => setEditLang(e.target.value)} className={`w-full p-4 rounded-2xl font-bold outline-none border focus:border-red-500 ${inputBg}`}>
+                    <select value={editLang} onChange={e => setEditLang(e.target.value)} className={`w-full p-4 rounded-2xl font-bold outline-none border focus:border-red-500 transition-colors ${darkMode ? 'bg-black/50 border-white/10' : 'bg-slate-100 border-slate-200'}`}>
                         <option value="ro" className="text-black bg-white">🇷🇴 Română</option>
                         <option value="en" className="text-black bg-white">🇬🇧 English</option>
                         <option value="fr" className="text-black bg-white">🇫🇷 Français</option>
@@ -378,19 +364,18 @@ export default function Dashboard() {
                 </div>
                 <div>
                     <label className="text-[10px] font-black tracking-widest uppercase opacity-50 mb-2 block">{t.class}</label>
-                    <input value={user.class} disabled className={`w-full p-4 rounded-2xl font-bold border opacity-50 cursor-not-allowed ${inputBg}`} />
+                    <input value={user.class} disabled className={`w-full p-4 rounded-2xl font-bold border opacity-50 cursor-not-allowed ${darkMode ? 'bg-black/50 border-white/10' : 'bg-slate-100 border-slate-200'}`} />
                 </div>
                 <div>
                     <label className="text-[10px] font-black tracking-widest uppercase opacity-50 mb-2 block">{t.phone}</label>
-                    <input value={editPhone} onChange={e=>setEditPhone(e.target.value.replace(/\D/g,'').slice(0,10))} className={`w-full p-4 rounded-2xl font-bold outline-none border focus:border-red-500 ${inputBg}`} />
+                    <input value={editPhone} onChange={e=>setEditPhone(e.target.value.replace(/\D/g,'').slice(0,10))} className={`w-full p-4 rounded-2xl font-bold outline-none border focus:border-red-500 transition-colors ${darkMode ? 'bg-black/50 border-white/10' : 'bg-slate-100 border-slate-200'}`} />
                 </div>
                 
-                {/* BUTON RESETARE PAROLĂ VIZIBIL AICI */}
-                <button onClick={handleResetPasswordInApp} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-black text-sm hover:bg-slate-700 transition-colors shadow-lg border border-white/10 mt-2">
+                <button onClick={handleResetPasswordInApp} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-black text-sm hover:bg-slate-700 hover:-translate-y-0.5 transition-all shadow-lg border border-white/10 mt-2">
                     {t.resetPass}
                 </button>
 
-                <button onClick={handleSaveSettings} className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-lg hover:bg-red-500 transition-colors shadow-lg shadow-red-500/20">{t.save}</button>
+                <button onClick={handleSaveSettings} className="w-full py-4 bg-gradient-to-r from-red-600 to-rose-500 text-white rounded-2xl font-black text-lg hover:shadow-lg hover:shadow-red-500/30 hover:-translate-y-0.5 transition-all">{t.save}</button>
             </div>
           </div>
         </div>
@@ -398,10 +383,10 @@ export default function Dashboard() {
 
       {/* MODAL NOTIFICARI */}
       {showNotif && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
           <div className={`w-full max-w-md p-8 rounded-[2.5rem] border shadow-2xl relative ${cardBg}`}>
-            <button onClick={() => setShowNotif(false)} className="absolute top-6 right-6 w-10 h-10 bg-black/10 dark:bg-white/10 rounded-full font-bold">✕</button>
-            <h2 className="text-2xl font-black mb-6">{t.notif}</h2>
+            <button onClick={() => setShowNotif(false)} className="absolute top-6 right-6 w-10 h-10 bg-black/10 dark:bg-white/10 rounded-full font-bold hover:rotate-90 transition-transform">✕</button>
+            <h2 className="text-2xl font-black mb-6 flex items-center gap-2">🔔 {t.notif}</h2>
             <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
               {notifications.length === 0 && <p className="opacity-50 italic text-center py-10">{t.noNotif}</p>}
               {notifications.map(n => {
@@ -409,13 +394,13 @@ export default function Dashboard() {
                 const notifMsg = n.type === 'welcome' ? t.welcomeMsg : (n.type === 'join_event' ? `${t.joinEventMsg} ${n.eventTitle}` : n.message);
 
                 return (
-                  <div key={n.id} className={`p-4 rounded-2xl border flex justify-between items-start gap-4 ${darkMode ? 'bg-white/5 border-white/5' : 'bg-slate-100 border-slate-200'}`}>
+                  <div key={n.id} className={`p-4 rounded-2xl border flex justify-between items-start gap-4 transition-colors hover:border-red-500/30 ${darkMode ? 'bg-white/5 border-white/5' : 'bg-slate-100 border-slate-200'}`}>
                     <div>
                         <p className="font-black text-sm mb-1">{notifTitle}</p>
                         <p className="text-sm opacity-80">{notifMsg}</p>
                         <p className="text-[10px] mt-2 font-mono opacity-40">{new Date(n.sentAt).toLocaleString('ro-RO')}</p>
                     </div>
-                    <button onClick={() => handleDeleteNotif(n.id)} className="text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition" title="Șterge">🗑️</button>
+                    <button onClick={() => handleDeleteNotif(n.id)} className="text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition-colors" title="Șterge">🗑️</button>
                   </div>
                 )
               })}
@@ -426,9 +411,9 @@ export default function Dashboard() {
 
       {/* FULL POST MODAL */}
       {selectedPost && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto custom-scrollbar" onClick={() => setSelectedPost(null)}>
-            <div className={`w-full max-w-2xl rounded-[2.5rem] overflow-hidden border my-auto relative ${cardBg}`} onClick={e => e.stopPropagation()}>
-              <button onClick={() => setSelectedPost(null)} className="absolute top-4 right-4 z-10 w-12 h-12 bg-black/50 text-white rounded-full font-black backdrop-blur-md border border-white/20 hover:bg-black/70 transition">✕</button>
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto custom-scrollbar animate-fade-in" onClick={() => setSelectedPost(null)}>
+            <div className={`w-full max-w-2xl rounded-[2.5rem] overflow-hidden border my-auto relative transform transition-all scale-100 ${cardBg}`} onClick={e => e.stopPropagation()}>
+              <button onClick={() => setSelectedPost(null)} className="absolute top-4 right-4 z-10 w-12 h-12 bg-black/50 text-white rounded-full font-black backdrop-blur-md border border-white/20 hover:bg-black/70 hover:rotate-90 transition-all">✕</button>
               {selectedPost.imageUrl && <div className="h-48 sm:h-72 w-full bg-cover bg-center" style={{backgroundImage:`url(${selectedPost.imageUrl})`}}></div>}
               <div className="p-6 sm:p-10 relative">
 
@@ -453,7 +438,7 @@ export default function Dashboard() {
                 )}
 
                 {selectedPost.type === 'activity' && (
-                  <button onClick={(e) => handleRegister(e, selectedPost)} className={`w-full py-4 rounded-2xl font-black text-lg shadow-xl transition-colors ${selectedPost.attendees?.some((a:any)=>a.id===user.id) ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white' : 'bg-green-600 text-white hover:bg-green-500'}`}>
+                  <button onClick={(e) => handleRegister(e, selectedPost)} className={`w-full py-4 rounded-2xl font-black text-lg shadow-xl transition-all ${selectedPost.attendees?.some((a:any)=>a.id===user.id) ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white' : 'bg-gradient-to-r from-green-600 to-emerald-500 text-white hover:shadow-green-500/30 hover:-translate-y-0.5'}`}>
                     {selectedPost.attendees?.some((a:any)=>a.id===user.id) ? t.cancel : t.join}
                   </button>
                 )}
