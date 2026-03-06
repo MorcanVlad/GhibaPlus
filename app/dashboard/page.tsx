@@ -1,16 +1,17 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { auth, db } from "../lib/firebase"; 
-import { sendPasswordResetEmail } from "firebase/auth"; // NOU: import pentru resetare
+import { sendPasswordResetEmail } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { doc, getDoc, updateDoc, collection, getDocs, arrayUnion, arrayRemove, orderBy, onSnapshot, addDoc, query, deleteDoc } from "firebase/firestore";
 
+// Traducerile statice pentru interfață (acum includ și Toată Școala / Clasa Mea)
 const TRANSLATIONS: any = {
-  ro: { search: "Caută...", settings: "⚙️ Setări", admin: "ADMIN", welcomeTitle: "Bine ai venit!", welcomeMsg: "Ne bucurăm să te avem pe GhibaPlus.", joinEventTitle: "Înscriere Confirmată ✅", joinEventMsg: "Te-ai înscris cu succes la:", notif: "Notificări", noNotif: "Nicio notificare.", dateTime: "DATA / ORA", location: "LOCAȚIE", join: "Particip ✅", cancel: "Anulează", readMore: "📖 Citește mai mult", lang: "Limba Interfeței", class: "Clasa Ta (Blocat)", phone: "Număr de Telefon", save: "Salvează Setările", council: "Consiliul Elevilor", noSpots: "Locuri epuizate!", translating: "Se traduce feed-ul...", resetPass: "🔑 Trimite link resetare parolă", resetSent: "Email-ul a fost trimis! Verifică Inbox-ul." },
-  en: { search: "Search...", settings: "⚙️ Settings", admin: "ADMIN", welcomeTitle: "Welcome!", welcomeMsg: "Glad to have you on GhibaPlus.", joinEventTitle: "Registration Confirmed ✅", joinEventMsg: "Successfully joined:", notif: "Notifications", noNotif: "No notifications.", dateTime: "DATE / TIME", location: "LOCATION", join: "Join ✅", cancel: "Cancel", readMore: "📖 Read More", lang: "Interface Language", class: "Your Class (Locked)", phone: "Phone Number", save: "Save Settings", council: "Student Council", noSpots: "No spots left!", translating: "Translating feed...", resetPass: "🔑 Send password reset link", resetSent: "Email sent! Check your Inbox." },
-  fr: { search: "Recherche...", settings: "⚙️ Paramètres", admin: "ADMIN", welcomeTitle: "Bienvenue !", welcomeMsg: "Heureux de vous avoir sur GhibaPlus !", joinEventTitle: "Inscription confirmée ✅", joinEventMsg: "Inscrit à :", notif: "Notifications", noNotif: "Pas de notifications.", dateTime: "DATE / HEURE", location: "LIEU", join: "Participer ✅", cancel: "Annuler", readMore: "📖 Détails", lang: "Langue", class: "Classe (Bloqué)", phone: "Téléphone", save: "Enregistrer", council: "Conseil", noSpots: "Complet!", translating: "Traduction du flux...", resetPass: "🔑 Réinitialiser le mot de passe", resetSent: "Email envoyé !" },
-  de: { search: "Suche...", settings: "⚙️ Einstellungen", admin: "ADMIN", welcomeTitle: "Willkommen!", welcomeMsg: "Schön, dass du bei GhibaPlus bist!", joinEventTitle: "Anmeldung bestätigt ✅", joinEventMsg: "Beigetreten:", notif: "Benachrichtigungen", noNotif: "Keine Nachrichten.", dateTime: "DATUM / ZEIT", location: "ORT", join: "Teilnehmen ✅", cancel: "Stornieren", readMore: "📖 Details", lang: "Sprache", class: "Klasse (Gesperrt)", phone: "Telefon", save: "Speichern", council: "Schülerrat", noSpots: "Voll!", translating: "Feed wird übersetzt...", resetPass: "🔑 Passwort zurücksetzen", resetSent: "E-Mail gesendet!" },
-  es: { search: "Buscar...", settings: "⚙️ Ajustes", admin: "ADMIN", welcomeTitle: "¡Bienvenido!", welcomeMsg: "Nos alegra tenerte en GhibaPlus.", joinEventTitle: "Registro Confirmado ✅", joinEventMsg: "Te uniste a:", notif: "Notificaciones", noNotif: "Sin notificaciones.", dateTime: "FECHA / HORA", location: "UBICACIÓN", join: "Participar ✅", cancel: "Cancelar", readMore: "📖 Detalles", lang: "Idioma", class: "Clase (Bloqueado)", phone: "Teléfono", save: "Guardar", council: "Consejo", noSpots: "¡Lleno!", translating: "Traduciendo feed...", resetPass: "🔑 Restablecer contraseña", resetSent: "¡Correo enviado!" }
+  ro: { search: "Caută...", settings: "⚙️ Setări", admin: "ADMIN", welcomeTitle: "Bine ai venit!", welcomeMsg: "Ne bucurăm să te avem pe GhibaPlus.", joinEventTitle: "Înscriere Confirmată ✅", joinEventMsg: "Te-ai înscris cu succes la:", notif: "Notificări", noNotif: "Nicio notificare.", dateTime: "DATA / ORA", location: "LOCAȚIE", join: "Particip ✅", cancel: "Anulează", readMore: "📖 Citește mai mult", lang: "Limba Interfeței", class: "Clasa Ta (Blocat)", phone: "Număr de Telefon", save: "Salvează Setările", council: "Consiliul Elevilor", noSpots: "Locuri epuizate!", translating: "Se traduce...", resetPass: "🔑 Trimite link resetare parolă", resetSent: "Email-ul a fost trimis! Verifică Inbox-ul.", allSchool: "Toată Școala", myClass: "Clasa Mea" },
+  en: { search: "Search...", settings: "⚙️ Settings", admin: "ADMIN", welcomeTitle: "Welcome!", welcomeMsg: "Glad to have you on GhibaPlus.", joinEventTitle: "Registration Confirmed ✅", joinEventMsg: "Successfully joined:", notif: "Notifications", noNotif: "No notifications.", dateTime: "DATE / TIME", location: "LOCATION", join: "Join ✅", cancel: "Cancel", readMore: "📖 Read More", lang: "Interface Language", class: "Your Class (Locked)", phone: "Phone Number", save: "Save Settings", council: "Student Council", noSpots: "No spots left!", translating: "Translating...", resetPass: "🔑 Send password reset link", resetSent: "Email sent! Check your Inbox.", allSchool: "Whole School", myClass: "My Class" },
+  fr: { search: "Recherche...", settings: "⚙️ Paramètres", admin: "ADMIN", welcomeTitle: "Bienvenue !", welcomeMsg: "Heureux de vous avoir sur GhibaPlus !", joinEventTitle: "Inscription confirmée ✅", joinEventMsg: "Inscrit à :", notif: "Notifications", noNotif: "Pas de notifications.", dateTime: "DATE / HEURE", location: "LIEU", join: "Participer ✅", cancel: "Annuler", readMore: "📖 Détails", lang: "Langue", class: "Classe (Bloqué)", phone: "Téléphone", save: "Enregistrer", council: "Conseil", noSpots: "Complet!", translating: "Traduction...", resetPass: "🔑 Réinitialiser le mot de passe", resetSent: "Email envoyé !", allSchool: "Toute l'école", myClass: "Ma Classe" },
+  de: { search: "Suche...", settings: "⚙️ Einstellungen", admin: "ADMIN", welcomeTitle: "Willkommen!", welcomeMsg: "Schön, dass du bei GhibaPlus bist!", joinEventTitle: "Anmeldung bestätigt ✅", joinEventMsg: "Beigetreten:", notif: "Benachrichtigungen", noNotif: "Keine Nachrichten.", dateTime: "DATUM / ZEIT", location: "ORT", join: "Teilnehmen ✅", cancel: "Stornieren", readMore: "📖 Details", lang: "Sprache", class: "Klasse (Gesperrt)", phone: "Telefon", save: "Speichern", council: "Schülerrat", noSpots: "Voll!", translating: "Übersetzen...", resetPass: "🔑 Passwort zurücksetzen", resetSent: "E-Mail gesendet!", allSchool: "Ganze Schule", myClass: "Meine Klasse" },
+  es: { search: "Buscar...", settings: "⚙️ Ajustes", admin: "ADMIN", welcomeTitle: "¡Bienvenido!", welcomeMsg: "Nos alegra tenerte en GhibaPlus.", joinEventTitle: "Registro Confirmado ✅", joinEventMsg: "Te uniste a:", notif: "Notificaciones", noNotif: "Sin notificaciones.", dateTime: "FECHA / HORA", location: "UBICACIÓN", join: "Participar ✅", cancel: "Cancelar", readMore: "📖 Detalles", lang: "Idioma", class: "Clase (Bloqueado)", phone: "Teléfono", save: "Guardar", council: "Consejo", noSpots: "¡Lleno!", translating: "Traduciendo...", resetPass: "🔑 Restablecer contraseña", resetSent: "¡Correo enviado!", allSchool: "Toda la Escuela", myClass: "Mi Clase" }
 };
 
 const GOOGLE_TRANSLATE_API_KEY = "AIzaSyD1qygcjmZh6ToLB5VcbwHQXArzzvPYHj8";
@@ -18,8 +19,12 @@ const GOOGLE_TRANSLATE_API_KEY = "AIzaSyD1qygcjmZh6ToLB5VcbwHQXArzzvPYHj8";
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
   const [feed, setFeed] = useState<any[]>([]);
-  const [translatedFeed, setTranslatedFeed] = useState<any[]>([]); // NOU: Stocăm feed-ul tradus
   const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
+  
+  // State-uri pentru listele traduse
+  const [translatedFeed, setTranslatedFeed] = useState<any[]>([]);
+  const [translatedCalendar, setTranslatedCalendar] = useState<any[]>([]);
+  
   const [notifications, setNotifications] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSettings, setShowSettings] = useState(false);
@@ -31,6 +36,9 @@ export default function Dashboard() {
   const [feedFilter, setFeedFilter] = useState("all"); 
   const [isTranslating, setIsTranslating] = useState(false);
   
+  // MEMORIA CACHE PENTRU TRADUCERI (Salvează interogările API)
+  const translationCache = useRef(new Map());
+
   const router = useRouter();
 
   useEffect(() => {
@@ -58,8 +66,7 @@ export default function Dashboard() {
     ];
     
     let feedItems = [...allItems].sort((a:any, b:any) => new Date(b.postedAt||b.date||0).getTime() - new Date(a.postedAt||a.date||0).getTime());
-    const rawFeed = feedItems.filter(item => item.type !== 'holiday' && item.type !== 'exam');
-    setFeed(rawFeed);
+    setFeed(feedItems.filter(item => item.type !== 'holiday' && item.type !== 'exam'));
     
     let calItems = allItems.filter(item => item.col === 'calendar_events');
     const today = new Date();
@@ -75,63 +82,90 @@ export default function Dashboard() {
 
   const t = TRANSLATIONS[editLang] || TRANSLATIONS["ro"];
 
-  // NOU: Funcția PROTEJATĂ de traducere
+  // Funcția principală de traducere, acum folosește memoria CACHE
   const translateText = async (text: string, targetLang: string) => {
     if (!text || targetLang === 'ro') return text;
+    
+    const cacheKey = `${targetLang}_${text}`;
+    // Dacă am tradus deja acest text în această limbă, dă-l din memorie (fără request)
+    if (translationCache.current.has(cacheKey)) {
+        return translationCache.current.get(cacheKey);
+    }
+
     try {
       const res = await fetch(`https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_TRANSLATE_API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ q: text, target: targetLang, source: 'ro' })
+        // format: 'text' previne problemele cu caracterele ciudate din baza de date
+        body: JSON.stringify({ q: text, target: targetLang, source: 'ro', format: 'text' })
       });
       const data = await res.json();
       
-      // Dacă Google refuză API-ul (ex: Billing neactivat), prevenim eroarea "Cannot read properties of undefined"
       if (data.error) {
-        console.error("⛔ Eroare API Google Translate:", data.error.message);
+        console.error("API Error:", data.error.message);
         return text; 
       }
-      return data.data.translations[0].translatedText;
+      
+      const translated = data.data.translations[0].translatedText;
+      // Salvăm în memorie pentru data viitoare
+      translationCache.current.set(cacheKey, translated);
+      return translated;
     } catch (error) {
-      console.error("⛔ Eroare conexiune API:", error);
+      console.error("Connection Error:", error);
       return text;
     }
   };
 
-  // NOU: Când se schimbă limba sau se încarcă feed-ul nou, traducem tot
+  // Acest efect se rulează de fiecare dată când feed-ul sau limba se schimbă
   useEffect(() => {
-    const translateWholeFeed = async () => {
-      if (editLang === 'ro' || feed.length === 0) {
+    const translateWholePage = async () => {
+      // Dacă e în română, afișăm direct
+      if (editLang === 'ro' || (feed.length === 0 && calendarEvents.length === 0)) {
         setTranslatedFeed(feed);
+        setTranslatedCalendar(calendarEvents);
         return;
       }
       
-      setIsTranslating(true);
+      // Verificăm dacă avem postări noi care nu sunt în cache, ca să nu afișăm textul "Translating..." la fiecare Like
+      let needsApi = false;
+      for (const item of [...feed, ...calendarEvents]) {
+          if (!translationCache.current.has(`${editLang}_${item.title}`) || 
+              (item.content && !translationCache.current.has(`${editLang}_${item.content}`))) {
+              needsApi = true; break;
+          }
+      }
+
+      if (needsApi) setIsTranslating(true);
+      
+      // Traducem Feed-ul
       const newFeed = await Promise.all(feed.map(async (item) => {
-        try {
-          const tTitle = await translateText(item.title, editLang);
-          const tContent = await translateText(item.content, editLang);
-          return { ...item, translatedTitle: tTitle, translatedContent: tContent };
-        } catch (e) {
-          return item;
-        }
+        const tTitle = await translateText(item.title, editLang);
+        const tContent = item.content ? await translateText(item.content, editLang) : "";
+        return { ...item, translatedTitle: tTitle, translatedContent: tContent };
+      }));
+
+      // Traducem Calendarul
+      const newCal = await Promise.all(calendarEvents.map(async (item) => {
+        const tTitle = await translateText(item.title, editLang);
+        return { ...item, translatedTitle: tTitle };
       }));
       
       setTranslatedFeed(newFeed);
-      setIsTranslating(false);
+      setTranslatedCalendar(newCal);
+      if (needsApi) setIsTranslating(false);
     };
 
-    translateWholeFeed();
-  }, [feed, editLang]);
+    translateWholePage();
+  }, [feed, calendarEvents, editLang]);
 
-  // NOU: Funcția de resetare a parolei din interiorul dashboard-ului
+  // RESETARE PAROLĂ
   const handleResetPasswordInApp = async () => {
-    if (!confirm("Vrei să îți resetezi parola? Vei primi un email de la noi.")) return;
+    if (!confirm("Vrei să îți resetezi parola? Vei primi un email de la noi (verifică și Spam).")) return;
     try {
         await sendPasswordResetEmail(auth, user.email);
         alert(t.resetSent);
     } catch (error: any) {
-        alert("Eroare: " + error.message);
+        alert("Eroare la resetare: " + error.message);
     }
   };
 
@@ -184,6 +218,14 @@ export default function Dashboard() {
     e.stopPropagation();
     const isLiked = item.likes?.includes(user.id);
     await updateDoc(doc(db, item.col, item.id), { likes: isLiked ? arrayRemove(user.id) : arrayUnion(user.id) });
+    
+    // Actualizăm selectedPost imediat, ca inima să se coloreze pe loc dacă modalul e deschis
+    if (selectedPost && selectedPost.id === item.id) {
+        setSelectedPost((prev:any) => ({
+            ...prev,
+            likes: isLiked ? prev.likes.filter((id:string)=>id!==user.id) : [...(prev.likes||[]), user.id]
+        }));
+    }
     loadFeed();
   };
 
@@ -211,7 +253,7 @@ export default function Dashboard() {
   const cardBg = darkMode ? "bg-slate-900/60 border-white/10 shadow-lg" : "bg-white border-slate-200/60 shadow-xl shadow-slate-200/50";
   const inputBg = darkMode ? "bg-black/50 border-white/10 text-white" : "bg-slate-50 border-slate-200 text-slate-900";
 
-  // Folosim translatedFeed in loc de feed normal!
+  // Filtrare aplicată pe feed-ul tradus
   const filteredFeed = translatedFeed.filter(item => {
     const sq = searchQuery.toLowerCase();
     const targetTitle = item.translatedTitle || item.title || "";
@@ -237,7 +279,7 @@ export default function Dashboard() {
             <input placeholder={t.search} className={`hidden md:block flex-1 max-w-sm mx-4 rounded-full px-6 py-2.5 text-sm font-medium outline-none border transition-all focus:border-red-500 ${inputBg}`} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
             
             <div className="flex items-center gap-3 sm:gap-5 flex-wrap justify-end">
-                {isTranslating && <span className="text-xs font-bold text-blue-500 animate-pulse hidden sm:inline">{t.translating}</span>}
+                {isTranslating && <span className="text-[10px] sm:text-xs font-bold text-blue-500 animate-pulse bg-blue-500/10 px-2 py-1 rounded-full hidden sm:inline">{t.translating}</span>}
                 <button onClick={toggleTheme} className="text-lg sm:text-xl hover:scale-110 transition-transform">{darkMode ? '☀️' : '🌙'}</button>
                 <button onClick={openNotifications} className="relative text-lg sm:text-xl hover:scale-110 transition-transform">
                     🔔 {notifications.some(n=>!n.read) && <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-600 rounded-full border-2 border-slate-900"></span>}
@@ -252,8 +294,9 @@ export default function Dashboard() {
       <main className="max-w-6xl mx-auto p-4 pt-28 grid lg:grid-cols-3 gap-8 relative z-10">
         <div className="lg:col-span-2 space-y-6">
           <div className={`flex justify-between items-center p-2 rounded-2xl border backdrop-blur-xl w-fit ${cardBg}`}>
-              <button onClick={() => setFeedFilter("all")} className={`px-4 py-2 text-sm font-bold rounded-xl transition ${feedFilter === 'all' ? 'bg-red-500 text-white shadow-md' : 'opacity-60 hover:opacity-100'}`}>Toată Școala</button>
-              <button onClick={() => setFeedFilter("class")} className={`px-4 py-2 text-sm font-bold rounded-xl transition ${feedFilter === 'class' ? 'bg-red-500 text-white shadow-md' : 'opacity-60 hover:opacity-100'}`}>Clasa Mea</button>
+              {/* Butoanele de feed sunt acum traduse */}
+              <button onClick={() => setFeedFilter("all")} className={`px-4 py-2 text-sm font-bold rounded-xl transition ${feedFilter === 'all' ? 'bg-red-500 text-white shadow-md' : 'opacity-60 hover:opacity-100'}`}>{t.allSchool}</button>
+              <button onClick={() => setFeedFilter("class")} className={`px-4 py-2 text-sm font-bold rounded-xl transition ${feedFilter === 'class' ? 'bg-red-500 text-white shadow-md' : 'opacity-60 hover:opacity-100'}`}>{t.myClass}</button>
           </div>
 
           {filteredFeed.map(item => (
@@ -304,17 +347,14 @@ export default function Dashboard() {
         <div className={`p-8 rounded-[2.5rem] sticky top-28 border backdrop-blur-xl h-fit ${cardBg}`}>
             <h3 className="font-black text-xl mb-6">📅 Calendar</h3>
             <div className="space-y-3">
-                {calendarEvents.length === 0 && <p className="opacity-50 text-sm italic py-4">Nu există evenimente viitoare.</p>}
-                {calendarEvents.map(ev => {
-                    // Căutăm varianta tradusă a evenimentului (dacă există în feed, sau îi aplicăm un translate basic pe viitor)
-                    // Calendar events are not currently deep-translated to save API, we just show original title
-                    return (
+                {translatedCalendar.length === 0 && <p className="opacity-50 text-sm italic py-4">Nu există evenimente viitoare.</p>}
+                {translatedCalendar.map(ev => (
                     <div key={ev.id} onClick={() => setSelectedPost(ev)} className={`cursor-pointer p-4 rounded-2xl border transition-all relative overflow-hidden transform hover:scale-[1.02] hover:shadow-lg ${darkMode ? 'bg-white/5 border-white/5 hover:bg-white/10' : 'bg-slate-50 border-slate-200 hover:bg-white'}`}>
                         <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${ev.type === 'holiday' ? 'bg-yellow-500' : (ev.type === 'exam' ? 'bg-purple-500' : 'bg-blue-500')}`}></div>
-                        <div className="font-bold text-sm ml-2 line-clamp-1">{ev.title}</div>
+                        <div className="font-bold text-sm ml-2 line-clamp-1">{ev.translatedTitle || ev.title}</div>
                         <div className="text-[10px] opacity-60 ml-2 mt-1 font-mono">{formatEventDateTime(ev)}</div>
                     </div>
-                )})}
+                ))}
             </div>
         </div>
       </main>
@@ -344,13 +384,13 @@ export default function Dashboard() {
                     <label className="text-[10px] font-black tracking-widest uppercase opacity-50 mb-2 block">{t.phone}</label>
                     <input value={editPhone} onChange={e=>setEditPhone(e.target.value.replace(/\D/g,'').slice(0,10))} className={`w-full p-4 rounded-2xl font-bold outline-none border focus:border-red-500 ${inputBg}`} />
                 </div>
-
-                {/* BUTON RESETARE PAROLĂ DIN SETĂRI */}
-                <button onClick={handleResetPasswordInApp} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-black text-sm hover:bg-slate-700 transition-colors shadow-lg border border-white/10">
+                
+                {/* BUTON RESETARE PAROLĂ VIZIBIL AICI */}
+                <button onClick={handleResetPasswordInApp} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-black text-sm hover:bg-slate-700 transition-colors shadow-lg border border-white/10 mt-2">
                     {t.resetPass}
                 </button>
 
-                <button onClick={handleSaveSettings} className="w-full py-4 mt-2 bg-red-600 text-white rounded-2xl font-black text-lg hover:bg-red-500 transition-colors shadow-lg shadow-red-500/20">{t.save}</button>
+                <button onClick={handleSaveSettings} className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-lg hover:bg-red-500 transition-colors shadow-lg shadow-red-500/20">{t.save}</button>
             </div>
           </div>
         </div>
