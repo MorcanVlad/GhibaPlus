@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { auth, db } from "../lib/firebase";
 import { useRouter } from "next/navigation";
-import { doc, getDoc, collection, addDoc, setDoc, getDocs, deleteDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, collection, addDoc, setDoc, getDocs, deleteDoc, updateDoc, onSnapshot, query, orderBy } from "firebase/firestore";
 import { SCHOOL_CLASSES } from "../lib/constants";
 
 export default function AdminPanel() {
@@ -10,6 +10,8 @@ export default function AdminPanel() {
   const [users, setUsers] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
   const [whitelistDb, setWhitelistDb] = useState<any[]>([]);
+  
+  const [adminMessages, setAdminMessages] = useState<any[]>([]);
   const [darkMode, setDarkMode] = useState(true);
   
   const [title, setTitle] = useState("");
@@ -31,6 +33,8 @@ export default function AdminPanel() {
   const [evLoc, setEvLoc] = useState("");
   const [spots, setSpots] = useState(0); 
   
+  const [organizerPhone, setOrganizerPhone] = useState("");
+  
   const [isTeamEvent, setIsTeamEvent] = useState(false);
   const [teamSize, setTeamSize] = useState(2);
   const [teamRule, setTeamRule] = useState("any");
@@ -50,7 +54,12 @@ export default function AdminPanel() {
     auth.onAuthStateChanged(async (u) => {
       if (!u) return router.push("/");
       const snap = await getDoc(doc(db, "users", u.uid));
-      if (snap.exists() && snap.data().role === 'admin') fetchData();
+      if (snap.exists() && snap.data().role === 'admin') {
+          fetchData();
+          onSnapshot(query(collection(db, "admin_messages"), orderBy("createdAt", "desc")), (s) => {
+              setAdminMessages(s.docs.map(d => ({id: d.id, ...d.data()})));
+          });
+      }
       else router.push("/dashboard");
     });
   }, []);
@@ -76,16 +85,19 @@ export default function AdminPanel() {
     fetchData();
   };
 
-  // NOU: Funcție globală de resetare a inputurilor 
+  const handleDeleteMessage = async (id: string) => {
+      if(!confirm("Ești sigur că vrei să ștergi acest mesaj?")) return;
+      await deleteDoc(doc(db, "admin_messages", id));
+  };
+
   const resetForm = () => {
-      setTitle(""); setContent(""); setImageUrl(""); setAuthorName("");
+      setTitle(""); setContent(""); setImageUrl(""); setAuthorName(""); setOrganizerPhone("");
       setSelectedClasses([]); setStartDate(""); setEndDate(""); setStartTime("");
       setEndTime(""); setHasTime(false); setEvLoc(""); setSpots(0);
       setIsTeamEvent(false); setTeamSize(2); setTeamRule("any");
       setEditingPost(null);
   };
 
-  // NOU: Când schimbi tab-ul, curăță automat inputurile 
   const handleTabSwitch = (tabId: string) => {
       setActiveTab(tabId);
       resetForm();
@@ -99,7 +111,7 @@ export default function AdminPanel() {
       if(post.col === 'calendar_events') {
           setEventType(post.type); setStartDate(post.date?.split('T')[0] || ""); setEndDate(post.endDate?.split('T')[0] || "");
           setHasTime(post.hasTime || false); setStartTime(post.startTime || ""); setEndTime(post.endTime || "");
-          setEvLoc(post.location || ""); setSpots(post.maxSpots || 0);
+          setEvLoc(post.location || ""); setSpots(post.maxSpots || 0); setOrganizerPhone(post.organizerPhone || "");
           setIsTeamEvent(post.isTeamEvent || false); setTeamSize(post.teamSize || 2); setTeamRule(post.teamRule || "any");
       }
   };
@@ -119,6 +131,7 @@ export default function AdminPanel() {
           
           if(eventType === 'activity') {
               updatedData.location = evLoc; updatedData.organizers = authorName; updatedData.maxSpots = spots;
+              updatedData.organizerPhone = organizerPhone;
               updatedData.isTeamEvent = isTeamEvent;
               if(isTeamEvent) { updatedData.teamSize = teamSize; updatedData.teamRule = teamRule; }
           }
@@ -126,7 +139,7 @@ export default function AdminPanel() {
 
       await updateDoc(doc(db, editingPost.col, editingPost.id), updatedData);
       alert("✅ Modificările au fost salvate!");
-      resetForm(); fetchData(); // Golim automat cand e gata
+      resetForm(); fetchData();
   };
 
   const handleSavePost = async (e: React.FormEvent) => {
@@ -150,6 +163,7 @@ export default function AdminPanel() {
 
     if (eventType === 'activity') {
         eventData.location = evLoc; eventData.organizers = authorName || "Consiliul Elevilor"; eventData.maxSpots = spots;
+        eventData.organizerPhone = organizerPhone; 
         if(isTeamEvent) { eventData.isTeamEvent = true; eventData.teamSize = teamSize; eventData.teamRule = teamRule; eventData.teams = []; } 
         else { eventData.attendees = []; }
     }
@@ -207,6 +221,37 @@ export default function AdminPanel() {
 
   const toggleClass = (c: string) => setSelectedClasses(prev => prev.includes(c) ? prev.filter(x=>x!==c) : [...prev, c]);
 
+  // NOU: Funcție pentru schimbarea individuală a clasei unui elev
+  const handleUserClassChange = async (userId: string, newClass: string) => {
+      if (!confirm(`Ești sigur că vrei să schimbi clasa acestui elev în ${newClass}?`)) return;
+      await updateDoc(doc(db, "users", userId), { class: newClass });
+      alert("✅ Clasa a fost actualizată!");
+      fetchData();
+  };
+
+  // NOU: Funcție pentru promovarea în masă a tuturor elevilor
+  const handlePromoteAll = async () => {
+      if (!confirm("⚠️ ATENȚIE! Această acțiune va avansa toți elevii cu un an (ex: 9 A devine 10 A). Elevii de a 12-a vor deveni 'Absolvenți'. Ești absolut sigur?")) return;
+      
+      let count = 0;
+      for (const u of users) {
+          if (!u.class || u.class === "Profesor" || u.class === "Absolvent") continue;
+          
+          let newClass = u.class;
+          if (newClass.startsWith("9 ")) newClass = newClass.replace("9 ", "10 ");
+          else if (newClass.startsWith("10 ")) newClass = newClass.replace("10 ", "11 ");
+          else if (newClass.startsWith("11 ")) newClass = newClass.replace("11 ", "12 ");
+          else if (newClass.startsWith("12 ")) newClass = "Absolvent";
+
+          if (newClass !== u.class) {
+              await updateDoc(doc(db, "users", u.id), { class: newClass });
+              count++;
+          }
+      }
+      alert(`✅ Succes! ${count} elevi au fost promovați în anul următor.`);
+      fetchData();
+  };
+
   const bgMain = darkMode ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-800";
   const cardBg = darkMode ? "bg-slate-900/80 border-white/10 shadow-2xl" : "bg-white border-slate-200 shadow-xl";
   const inputBg = darkMode ? "bg-black/50 border-white/10 text-white placeholder-gray-500" : "bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-500";
@@ -222,7 +267,7 @@ export default function AdminPanel() {
         </div>
 
         <div className={`flex gap-2 sm:gap-4 mb-10 p-2 sm:p-3 rounded-3xl border backdrop-blur-md overflow-x-auto custom-scrollbar ${cardBg}`}>
-          {[{id:'gestiune', icon:'🗑️', lbl:'Gestiune'}, {id:'users', icon:'👥', lbl:'Elevi/Istoric'}, {id:'news', icon:'📢', lbl:'Știri'}, {id:'events', icon:'📅', lbl:'Evenimente'}, {id:'notif', icon:'🔔', lbl:'Notificări'}, {id:'whitelist', icon:'📧', lbl:'Aprobă'}].map(t => (
+          {[{id:'gestiune', icon:'🗑️', lbl:'Gestiune'}, {id:'users', icon:'👥', lbl:'Elevi'}, {id:'news', icon:'📢', lbl:'Știri'}, {id:'events', icon:'📅', lbl:'Evenimente'}, {id:'notif', icon:'🔔', lbl:'Notificări / Inbox'}, {id:'whitelist', icon:'📧', lbl:'Aprobă'}].map(t => (
             <button key={t.id} onClick={()=>handleTabSwitch(t.id)} className={`flex-shrink-0 px-4 sm:flex-1 py-3 sm:py-4 rounded-2xl font-black text-xs sm:text-sm transition-all ${activeTab === t.id ? 'bg-red-600 text-white shadow-lg' : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-60'}`}>
               {t.icon} <span className="hidden sm:inline">{t.lbl}</span>
             </button>
@@ -269,6 +314,13 @@ export default function AdminPanel() {
                         <input placeholder="Titlu Postare" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={title} onChange={e=>setTitle(e.target.value)} required />
                         <input placeholder="Autor / Organizator" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={authorName} onChange={e=>setAuthorName(e.target.value)} />
                     </div>
+
+                    {editingPost.col === 'calendar_events' && editingPost.type === 'activity' && (
+                        <div className="mb-4">
+                             <input placeholder="Telefon Organizator (Obligatoriu)" type="tel" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={organizerPhone} onChange={e=>setOrganizerPhone(e.target.value.replace(/\D/g,'').slice(0,10))} required />
+                        </div>
+                    )}
+
                     <textarea placeholder="Conținutul..." className={`w-full p-4 rounded-2xl outline-none border h-32 resize-none mb-4 ${inputBg}`} value={content} onChange={e=>setContent(e.target.value)} required />
                     
                     <div className="mb-6">
@@ -311,14 +363,31 @@ export default function AdminPanel() {
             </div>
         )}
 
+        {/* --- TAB-UL USERS --- */}
         {activeTab === "users" && (
           <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
-            <h2 className="text-2xl font-black mb-6">👥 Gestiune & Istoric Elevi</h2>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+                <h2 className="text-2xl font-black">👥 Gestiune & Istoric Elevi</h2>
+                <button onClick={handlePromoteAll} className="bg-green-600 hover:bg-green-500 text-white px-5 py-3 rounded-xl font-black text-sm transition shadow-lg shadow-green-500/20 whitespace-nowrap">⬆️ Promovează toți elevii (An Nou)</button>
+            </div>
+            
             <input placeholder="Caută elev..." className={`w-full p-4 mb-6 rounded-2xl outline-none border focus:border-red-500 ${inputBg}`} value={userSearch} onChange={e => setUserSearch(e.target.value)} />
+            
             <div className="grid gap-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
               {users.filter(u => u.name?.toLowerCase().includes(userSearch.toLowerCase()) || u.email?.toLowerCase().includes(userSearch.toLowerCase())).map(u => (
                 <div key={u.id} className={`p-4 sm:p-6 rounded-2xl border flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 ${darkMode ? 'bg-black/40 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
-                  <div><p className="font-black text-lg">{u.name}</p><p className="text-xs opacity-50 font-mono mt-1">{u.email}</p></div>
+                  <div>
+                      <p className="font-black text-lg mb-1">{u.name}</p>
+                      <div className="flex items-center gap-3">
+                          <p className="text-xs opacity-50 font-mono">{u.email}</p>
+                          {/* NOU: Selector pentru schimbarea clasei direct din listă */}
+                          <select value={u.class || ""} onChange={(e) => handleUserClassChange(u.id, e.target.value)} className={`text-xs p-1.5 rounded-lg border outline-none font-bold ${darkMode ? 'bg-slate-800 text-white border-white/20' : 'bg-white text-black border-slate-300'}`}>
+                              <option value="Profesor">Profesor</option>
+                              <option value="Absolvent">Absolvent</option>
+                              {SCHOOL_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                      </div>
+                  </div>
                   <div className="flex items-center gap-3">
                     <button onClick={() => showUserHistory(u)} className="bg-blue-500/10 text-blue-500 px-4 py-2.5 rounded-xl font-bold text-xs hover:bg-blue-500 hover:text-white transition">Vezi Istoric</button>
                     <button onClick={() => handleDelete(u.id, 'users')} className="bg-red-500/10 text-red-500 px-4 py-2.5 rounded-xl font-bold text-xs hover:bg-red-500 hover:text-white transition">Șterge</button>
@@ -359,6 +428,14 @@ export default function AdminPanel() {
                     <input placeholder="Titlu Eveniment / Vacanță" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={title} onChange={e=>setTitle(e.target.value)} required />
                     {eventType === 'activity' && <input placeholder="Organizator" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={authorName} onChange={e=>setAuthorName(e.target.value)} />}
                 </div>
+
+                {eventType === 'activity' && (
+                    <div className="mb-4 animate-fade-in">
+                        <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Telefon Organizator (Pentru Contact)</label>
+                        <input placeholder="Ex: 0712345678" type="tel" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={organizerPhone} onChange={e=>setOrganizerPhone(e.target.value.replace(/\D/g,'').slice(0,10))} required />
+                    </div>
+                )}
+
                 <textarea placeholder="Detalii suplimentare..." className={`w-full p-4 rounded-2xl outline-none border h-24 resize-none mb-4 ${inputBg}`} value={content} onChange={e=>setContent(e.target.value)} required />
                 <div className="mb-6"><label className="text-[10px] font-black uppercase opacity-50 block mb-2">Imagine Copertă (URL Extern)</label><input placeholder="Ex: https://imgur.com/poza.jpg" value={imageUrl} onChange={e=>setImageUrl(e.target.value)} className={`w-full p-4 rounded-xl border ${inputBg}`} /></div>
 
@@ -406,18 +483,47 @@ export default function AdminPanel() {
             </form>
         )}
 
+        {/* --- TAB-UL NOTIFICĂRI & INBOX MESAJE UTILIZATORI --- */}
         {activeTab === "notif" && (
-            <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl max-w-2xl ${cardBg}`}>
-              <h2 className="text-2xl font-black mb-8">📢 Trimite Notificare Push</h2>
-              <div className="space-y-4">
-                <select value={selectedClassNotif} onChange={(e)=>setSelectedClassNotif(e.target.value)} className={`w-full p-4 rounded-2xl font-black outline-none border ${inputBg}`}>
-                  <option value="Toată Școala" className="bg-white text-black">Către: Toată Școala</option>
-                  {SCHOOL_CLASSES.map(c => <option key={c} value={c} className="bg-white text-black">Clasa: {c}</option>)}
-                </select>
-                <input placeholder="Titlu scurt" className={`w-full p-4 rounded-2xl font-bold border outline-none ${inputBg}`} value={notifTitle} onChange={e=>setNotifTitle(e.target.value)} />
-                <textarea placeholder="Mesajul tău..." className={`w-full p-4 rounded-2xl border outline-none h-32 resize-none ${inputBg}`} value={notifBody} onChange={e=>setNotifBody(e.target.value)} />
-                <button onClick={handleSendNotif} className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-lg hover:bg-red-500 transition">Trimite</button>
-              </div>
+            <div className="grid lg:grid-cols-2 gap-8">
+                {/* Partea Stângă: Trimite Notificări Push */}
+                <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
+                  <h2 className="text-xl font-black mb-6">📢 Trimite Notificare</h2>
+                  <div className="space-y-4">
+                    <select value={selectedClassNotif} onChange={(e)=>setSelectedClassNotif(e.target.value)} className={`w-full p-4 rounded-2xl font-black outline-none border ${inputBg}`}>
+                      <option value="Toată Școala" className="bg-white text-black">Către: Toată Școala</option>
+                      {SCHOOL_CLASSES.map(c => <option key={c} value={c} className="bg-white text-black">Clasa: {c}</option>)}
+                    </select>
+                    <input placeholder="Titlu scurt" className={`w-full p-4 rounded-2xl font-bold border outline-none ${inputBg}`} value={notifTitle} onChange={e=>setNotifTitle(e.target.value)} />
+                    <textarea placeholder="Mesajul tău..." className={`w-full p-4 rounded-2xl border outline-none h-32 resize-none ${inputBg}`} value={notifBody} onChange={e=>setNotifBody(e.target.value)} />
+                    <button onClick={handleSendNotif} className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-lg hover:bg-red-500 transition shadow-lg">Trimite Elevilor</button>
+                  </div>
+                </div>
+
+                {/* Partea Dreaptă: Inbox Mesaje de la Utilizatori */}
+                <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl flex flex-col ${cardBg}`}>
+                    <h2 className="text-xl font-black mb-6 flex items-center gap-2 text-blue-500">📥 Inbox Utilizatori</h2>
+                    <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1 max-h-[500px]">
+                        {adminMessages.length === 0 && <p className="opacity-50 text-sm italic py-10 text-center">Niciun mesaj primit recent.</p>}
+                        {adminMessages.map(msg => (
+                            <div key={msg.id} className={`p-4 rounded-2xl border ${darkMode ? 'bg-black/40 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
+                                <div className="flex justify-between items-start mb-2 border-b border-black/10 dark:border-white/10 pb-2">
+                                    <div>
+                                        <p className="font-black text-sm">{msg.userName}</p>
+                                        <p className="text-[10px] font-mono opacity-60">{msg.userClass} • {new Date(msg.createdAt).toLocaleString('ro-RO')}</p>
+                                    </div>
+                                    <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${msg.reason === 'Schimbare Clasă' ? 'bg-orange-500/20 text-orange-500' : msg.reason === 'Raportare Bug/Eroare' ? 'bg-red-500/20 text-red-500' : 'bg-blue-500/20 text-blue-500'}`}>
+                                        {msg.reason}
+                                    </span>
+                                </div>
+                                <p className="text-sm opacity-80 mb-3 whitespace-pre-wrap">{msg.message}</p>
+                                <div className="flex justify-end">
+                                    <button onClick={() => handleDeleteMessage(msg.id)} className="text-[10px] font-bold text-red-500 hover:underline">Rezolvat (Șterge)</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
         )}
 
