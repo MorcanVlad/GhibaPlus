@@ -6,11 +6,11 @@ import { useRouter } from "next/navigation";
 import { doc, getDoc, updateDoc, collection, arrayUnion, arrayRemove, orderBy, onSnapshot, addDoc, query, deleteDoc } from "firebase/firestore";
 
 const TRANSLATIONS: any = {
-  ro: { search: "Caută noutăți...", settings: "Setări", admin: "ADMIN", welcomeTitle: "Bine ai venit!", welcomeMsg: "Ne bucurăm să te avem pe GhibaPlus.", notif: "Notificări", noNotif: "Nicio notificare momentan.", dateTime: "DATA / ORA", location: "LOCAȚIE", join: "Particip ✅", cancel: "Retrage-te", teamJoin: "Înscrie Echipă 👥", teamManage: "Gestionează Echipa", lang: "Limba Interfeței", class: "Clasa Ta", phone: "Număr de Telefon", save: "Salvează Setările", council: "Consiliul Elevilor", noSpots: "Locuri epuizate!", translating: "Se traduce...", resetPass: "🔑 Trimite link resetare parolă", resetSent: "Email-ul a fost trimis!", allSchool: "Toată Școala", myClass: "Clasa Mea", logout: "Ieșire", spots: "Locuri", unlimited: "Nelimitat", calendarTitle: "📅 Calendar", contactAdmin: "Contactează Administratorul", ruleAny: "Liber (Fără restricții)", ruleSameClass: "Strict: Doar din clasa ta", rulePlusOne: "Maxim 1 elev din altă clasă" },
-  en: { search: "Search news...", settings: "Settings", admin: "ADMIN", welcomeTitle: "Welcome!", welcomeMsg: "Glad to have you on GhibaPlus.", notif: "Notifications", noNotif: "No notifications.", dateTime: "DATE / TIME", location: "LOCATION", join: "Join ✅", cancel: "Leave", teamJoin: "Register Team 👥", teamManage: "Manage Team", lang: "Interface Language", class: "Your Class", phone: "Phone Number", save: "Save Settings", council: "Student Council", noSpots: "No spots left!", translating: "Translating...", resetPass: "🔑 Send password reset link", resetSent: "Email sent!", allSchool: "Whole School", myClass: "My Class", logout: "Logout", spots: "Spots", unlimited: "Unlimited", calendarTitle: "📅 Calendar", contactAdmin: "Contact Administrator", ruleAny: "No restrictions", ruleSameClass: "Strict: Same class only", rulePlusOne: "Max 1 from another class" },
-  fr: { search: "Recherche...", settings: "Paramètres", admin: "ADMIN", welcomeTitle: "Bienvenue !", welcomeMsg: "Heureux de vous avoir sur GhibaPlus !", notif: "Notifications", noNotif: "Pas de notifications.", dateTime: "DATE / HEURE", location: "LIEU", join: "Participer ✅", cancel: "Annuler", teamJoin: "Inscrire l'équipe 👥", teamManage: "Gérer l'équipe", lang: "Langue", class: "Classe", phone: "Téléphone", save: "Enregistrer", council: "Conseil", noSpots: "Complet!", translating: "Traduction...", resetPass: "🔑 Réinitialiser le mot de passe", resetSent: "Email envoyé !", allSchool: "Toute l'école", myClass: "Ma Classe", logout: "Déconnexion", spots: "Places", unlimited: "Illimité", calendarTitle: "📅 Calendrier", contactAdmin: "Contacter l'administrateur", ruleAny: "Aucune restriction", ruleSameClass: "Strict: Même classe", rulePlusOne: "Max 1 d'une autre classe" },
-  de: { search: "Suche...", settings: "Einstellungen", admin: "ADMIN", welcomeTitle: "Willkommen!", welcomeMsg: "Schön, dass du bei GhibaPlus bist!", notif: "Benachrichtigungen", noNotif: "Keine Nachrichten.", dateTime: "DATUM / ZEIT", location: "ORT", join: "Teilnehmen ✅", cancel: "Verlassen", teamJoin: "Team anmelden 👥", teamManage: "Team verwalten", lang: "Sprache", class: "Klasse", phone: "Telefon", save: "Speichern", council: "Schülerrat", noSpots: "Voll!", translating: "Übersetzen...", resetPass: "🔑 Passwort zurücksetzen", resetSent: "E-Mail gesendet!", allSchool: "Ganze Schule", myClass: "Meine Klasse", logout: "Abmelden", spots: "Plätze", unlimited: "Unbegrenzt", calendarTitle: "📅 Kalender", contactAdmin: "Administrator kontaktieren", ruleAny: "Keine Einschränkungen", ruleSameClass: "Streng: Gleiche Klasse", rulePlusOne: "Max 1 aus anderer Klasse" },
-  es: { search: "Buscar...", settings: "Ajustes", admin: "ADMIN", welcomeTitle: "¡Bienvenido!", welcomeMsg: "Nos alegra tenerte en GhibaPlus.", notif: "Notificaciones", noNotif: "Sin notificaciones.", dateTime: "FECHA / HORA", location: "UBICACIÓN", join: "Participar ✅", cancel: "Salir", teamJoin: "Registrar Equipo 👥", teamManage: "Gestionar Equipo", lang: "Idioma", class: "Clase", phone: "Teléfono", save: "Guardar", council: "Consejo", noSpots: "¡Lleno!", translating: "Traduciendo...", resetPass: "🔑 Restablecer contraseña", resetSent: "¡Correo enviado!", allSchool: "Toda la Escuela", myClass: "Mi Clase", logout: "Cerrar sesión", spots: "Lugares", unlimited: "Ilimitado", calendarTitle: "📅 Calendario", contactAdmin: "Contactar Administrador", ruleAny: "Sin restricciones", ruleSameClass: "Estricto: Misma clase", rulePlusOne: "Máx 1 de otra clase" }
+  ro: { search: "Caută noutăți...", settings: "Setări", admin: "ADMIN", welcomeTitle: "Bine ai venit,", welcomeMsg: "Ne bucurăm să te avem pe GhibaPlus.", notif: "Notificări", noNotif: "Nicio notificare momentan.", dateTime: "DATA / ORA", location: "LOCAȚIE", join: "Particip ✅", cancel: "Retrage-te", teamJoin: "Înscrie Echipă 👥", teamManage: "Gestionează Echipa", lang: "Limba Interfeței", class: "Clasa Ta", phone: "Număr de Telefon", save: "Salvează Setările", council: "Consiliul Elevilor", noSpots: "Locuri epuizate!", translating: "Se traduce...", resetPass: "🔑 Trimite link resetare parolă", resetSent: "Email-ul a fost trimis!", allSchool: "Toată Școala", myClass: "Clasa Mea", logout: "Deconectare", spots: "Locuri", unlimited: "Nelimitat", calendarTitle: "📅 Calendar", contactAdmin: "Contactează Administratorul", ruleAny: "Liber (Fără restricții)", ruleSameClass: "Strict: Doar din clasa ta", rulePlusOne: "Maxim 1 elev din altă clasă" },
+  en: { search: "Search news...", settings: "Settings", admin: "ADMIN", welcomeTitle: "Welcome,", welcomeMsg: "Glad to have you on GhibaPlus.", notif: "Notifications", noNotif: "No notifications.", dateTime: "DATE / TIME", location: "LOCATION", join: "Join ✅", cancel: "Leave", teamJoin: "Register Team 👥", teamManage: "Manage Team", lang: "Interface Language", class: "Your Class", phone: "Phone Number", save: "Save Settings", council: "Student Council", noSpots: "No spots left!", translating: "Translating...", resetPass: "🔑 Send password reset link", resetSent: "Email sent!", allSchool: "Whole School", myClass: "My Class", logout: "Logout", spots: "Spots", unlimited: "Unlimited", calendarTitle: "📅 Calendar", contactAdmin: "Contact Administrator", ruleAny: "No restrictions", ruleSameClass: "Strict: Same class only", rulePlusOne: "Max 1 from another class" },
+  fr: { search: "Recherche...", settings: "Paramètres", admin: "ADMIN", welcomeTitle: "Bienvenue,", welcomeMsg: "Heureux de vous avoir sur GhibaPlus !", notif: "Notifications", noNotif: "Pas de notifications.", dateTime: "DATE / HEURE", location: "LIEU", join: "Participer ✅", cancel: "Annuler", teamJoin: "Inscrire l'équipe 👥", teamManage: "Gérer l'équipe", lang: "Langue", class: "Classe", phone: "Téléphone", save: "Enregistrer", council: "Conseil", noSpots: "Complet!", translating: "Traduction...", resetPass: "🔑 Réinitialiser le mot de passe", resetSent: "Email envoyé !", allSchool: "Toute l'école", myClass: "Ma Classe", logout: "Déconnexion", spots: "Places", unlimited: "Illimité", calendarTitle: "📅 Calendrier", contactAdmin: "Contacter l'administrateur", ruleAny: "Aucune restriction", ruleSameClass: "Strict: Même classe", rulePlusOne: "Max 1 d'une autre classe" },
+  de: { search: "Suche...", settings: "Einstellungen", admin: "ADMIN", welcomeTitle: "Willkommen,", welcomeMsg: "Schön, dass du bei GhibaPlus bist!", notif: "Benachrichtigungen", noNotif: "Keine Nachrichten.", dateTime: "DATUM / ZEIT", location: "ORT", join: "Teilnehmen ✅", cancel: "Verlassen", teamJoin: "Team anmelden 👥", teamManage: "Team verwalten", lang: "Sprache", class: "Klasse", phone: "Telefon", save: "Speichern", council: "Schülerrat", noSpots: "Voll!", translating: "Übersetzen...", resetPass: "🔑 Passwort zurücksetzen", resetSent: "E-Mail gesendet!", allSchool: "Ganze Schule", myClass: "Meine Klasse", logout: "Abmelden", spots: "Plätze", unlimited: "Unbegrenzt", calendarTitle: "📅 Kalender", contactAdmin: "Administrator kontaktieren", ruleAny: "Keine Einschränkungen", ruleSameClass: "Streng: Gleiche Klasse", rulePlusOne: "Max 1 aus anderer Klasse" },
+  es: { search: "Buscar...", settings: "Ajustes", admin: "ADMIN", welcomeTitle: "¡Bienvenido,", welcomeMsg: "Nos alegra tenerte en GhibaPlus.", notif: "Notificaciones", noNotif: "Sin notificaciones.", dateTime: "FECHA / HORA", location: "UBICACIÓN", join: "Participar ✅", cancel: "Salir", teamJoin: "Registrar Equipo 👥", teamManage: "Gestionar Equipo", lang: "Idioma", class: "Clase", phone: "Teléfono", save: "Guardar", council: "Consejo", noSpots: "¡Lleno!", translating: "Traduciendo...", resetPass: "🔑 Restablecer contraseña", resetSent: "¡Correo enviado!", allSchool: "Toda la Escuela", myClass: "Mi Clase", logout: "Cerrar sesión", spots: "Lugares", unlimited: "Ilimitado", calendarTitle: "📅 Calendario", contactAdmin: "Contactar Administrador", ruleAny: "Sin restricciones", ruleSameClass: "Estricto: Misma clase", rulePlusOne: "Máx 1 de otra clase" }
 };
 
 export default function Dashboard() {
@@ -48,7 +48,6 @@ export default function Dashboard() {
   const [contactReason, setContactReason] = useState("Schimbare Clasă");
   const [contactMessage, setContactMessage] = useState("");
 
-  // NOU: Stări pentru pop-up-urile de schimbare clasă / Absolvire
   const [showClassChangePopup, setShowClassChangePopup] = useState(false);
   const [showGraduatePopup, setShowGraduatePopup] = useState(false);
   const [newClassName, setNewClassName] = useState("");
@@ -69,12 +68,10 @@ export default function Dashboard() {
         setUser(userData); 
         setEditPhone(userData.phone || ""); 
         
-        // Dacă e absolvent forțăm RO ca să nu cheltuim API (Resurse)
         const isGraduate = userData.class === "Absolvent";
         const langToSet = isGraduate ? "ro" : (userData.language || "ro");
         setCurrentLang(langToSet); setEditLang(langToSet);
         
-        // NOU: Logica de notificare a schimbării clasei
         if (userData.lastSeenClass && userData.lastSeenClass !== userData.class) {
             if (userData.class === "Absolvent") {
                 setShowGraduatePopup(true);
@@ -83,7 +80,6 @@ export default function Dashboard() {
                 setShowClassChangePopup(true);
             }
         } else if (!userData.lastSeenClass && userData.class) {
-            // Dacă nu are field-ul setat (cont vechi), îl setăm ca să nu dea popup aiurea
             await updateDoc(doc(db, "users", u.uid), { lastSeenClass: userData.class });
         }
 
@@ -103,7 +99,6 @@ export default function Dashboard() {
     };
   }, [router]);
 
-  // NOU: Funcții pentru a închide pop-up-ul și a salva în baza de date
   const handleAcknowledgeClassChange = async () => {
       setShowClassChangePopup(false);
       setShowGraduatePopup(false);
@@ -147,7 +142,6 @@ export default function Dashboard() {
   const t = TRANSLATIONS[currentLang] || TRANSLATIONS["ro"];
 
   const translateText = async (text: string, targetLang: string) => {
-    // BLOCAJ API PENTRU ABSOLVENTI!
     if (user?.class === "Absolvent" || !text || typeof text !== 'string' || text.trim() === '' || targetLang === 'ro') return text || "";
     const cacheKey = `${targetLang}_${text}`;
     if (translationCache.current.has(cacheKey)) return translationCache.current.get(cacheKey);
@@ -167,7 +161,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     const translateWholePage = async () => {
-      // Daca e pe ro sau e Absolvent, nu face NICIUN API call (economie)
       if (currentLang === 'ro' || user?.class === "Absolvent" || (feed.length === 0 && calendarEvents.length === 0 && notifications.length === 0)) {
         setTranslatedFeed([...feed]); setTranslatedCalendar([...calendarEvents]); setTranslatedNotifications([...notifications]); return;
       }
@@ -393,84 +386,96 @@ export default function Dashboard() {
                 <button onClick={openNotifications} className="relative w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-transform hover:scale-110 text-sm sm:text-base">🔔 {notifications.some(n=>!n.read) && <span className="absolute top-1 right-1 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-red-600 rounded-full border-2 border-white dark:border-slate-800 animate-pulse"></span>}</button>
                 <button onClick={() => setShowSettings(true)} className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-transform duration-300 hover:rotate-90 origin-center text-sm sm:text-base">⚙️</button>
 
+                {/* MODIFICAT PENTRU A NU MAI ASCUNDE BUTONUL DE LOGOUT */}
                 <div className="flex items-center gap-1 sm:gap-2 pl-1 sm:pl-2 border-l border-black/10 dark:border-white/10 ml-0.5 sm:ml-1">
                     {(user.role === 'admin' || user.role === 'profesor') && (
-                        <button onClick={() => router.push('/admin')} className={`bg-gradient-to-r ${user.role === 'profesor' ? 'from-blue-600 to-indigo-500 shadow-blue-500/20' : 'from-red-600 to-rose-500 shadow-red-500/20'} text-white px-2.5 py-1 sm:px-4 sm:py-1.5 rounded-full text-[9px] sm:text-[11px] font-black shadow-lg hover:-translate-y-0.5 transition-all`}>
-                            {user.role === 'admin' ? 'ADMIN' : 'PROFESOR'}
+                        <button onClick={() => router.push('/admin')} className={`bg-gradient-to-r ${user.role === 'profesor' ? 'from-blue-600 to-indigo-500 shadow-blue-500/20' : 'from-red-600 to-rose-500 shadow-red-500/20'} text-white px-2 py-1 sm:px-4 sm:py-1.5 rounded-full text-[9px] sm:text-[11px] font-black shadow-lg hover:-translate-y-0.5 transition-all`}>
+                            <span className="hidden sm:inline">{user.role === 'admin' ? 'ADMIN' : 'PROFESOR'}</span>
+                            <span className="sm:hidden">{user.role === 'admin' ? 'ADM' : 'PROF'}</span>
                         </button>
                     )}
                     <button onClick={handleSecureLogout} className="text-[10px] sm:text-xs font-bold opacity-60 hover:opacity-100 hover:text-red-500 transition-colors pr-1 sm:pr-2 hidden sm:block">{t.logout}</button>
-                    <button onClick={handleSecureLogout} className="sm:hidden text-lg opacity-60 hover:opacity-100 hover:text-red-500 pr-1" title={t.logout}>🚪</button>
+                    <button onClick={handleSecureLogout} className="sm:hidden text-lg opacity-60 hover:opacity-100 hover:text-red-500 pl-1 pr-1" title={t.logout}>🚪</button>
                 </div>
             </div>
         </div>
       </nav>
 
       <main className="max-w-6xl mx-auto p-4 pt-24 sm:pt-28 grid lg:grid-cols-3 gap-6 sm:gap-8 relative z-10">
-        <div className="lg:col-span-2 space-y-6">
-          <div className={`flex justify-between items-center p-1.5 rounded-2xl border backdrop-blur-xl w-fit ${cardBg}`}>
+        <div className="lg:col-span-2">
+            
+          {/* NOU: BROWSER BUN VENIT (FEED HEADER) */}
+          <div className={`p-6 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] border backdrop-blur-xl mb-6 shadow-sm ${cardBg}`}>
+              <h2 className="text-2xl sm:text-3xl font-black mb-1 leading-tight">
+                  {t.welcomeTitle} <span className="text-red-500">{user.name?.split(' ')[0]}</span> 👋
+              </h2>
+              <p className="opacity-70 font-medium text-sm sm:text-base">{t.welcomeMsg}</p>
+          </div>
+
+          <div className={`flex justify-between items-center p-1.5 rounded-2xl border backdrop-blur-xl w-fit mb-6 ${cardBg}`}>
               <button onClick={() => setFeedFilter("all")} className={`px-4 sm:px-5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all duration-300 ${feedFilter === 'all' ? 'bg-red-500 text-white shadow-md' : 'opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}>{t.allSchool}</button>
               <button onClick={() => setFeedFilter("class")} className={`px-4 sm:px-5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all duration-300 ${feedFilter === 'class' ? 'bg-red-500 text-white shadow-md' : 'opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}>{t.myClass}</button>
           </div>
 
-          {filteredFeed.map(item => (
-            <div key={item.id} onClick={() => setSelectedPost(item)} className={`rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden border backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 sm:hover:-translate-y-1.5 hover:shadow-2xl cursor-pointer ${cardBg}`}>
-              <div className="p-6 sm:p-8">
-                <div className="flex gap-4 sm:gap-5 items-start mb-5 sm:mb-6">
-                  {item.type === 'activity' && item.date ? (
-                     <div className={`text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl flex flex-col items-center shadow-lg border bg-gradient-to-br from-red-500 to-rose-600 border-red-400/30 shrink-0 transform transition-transform group-hover:scale-105`}>
-                        <span className="text-xl sm:text-2xl font-black leading-none mb-1">{new Date(item.date).getDate()}</span>
-                        <span className="text-[9px] sm:text-[10px] font-black uppercase">{new Date(item.date).toLocaleString(currentLang, {month:'short'})}</span>
-                     </div>
-                  ) : (
-                     <div className="w-12 h-12 sm:w-14 sm:h-14 shrink-0 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-2xl shadow-lg flex items-center justify-center border border-blue-400/30 font-black text-xl sm:text-2xl transform transition-transform group-hover:scale-105">📢</div>
-                  )}
-                  <div>
-                    <h2 className="text-lg sm:text-2xl font-black mb-1 leading-tight">{item.translatedTitle || item.title}</h2>
-                    {(item.authorName || item.organizers) && <p className="opacity-60 text-[10px] sm:text-xs font-bold uppercase tracking-widest">{item.authorName || item.organizers || t.council}</p>}
-                  </div>
-                </div>
-                {item.imageUrl && <div className="h-48 sm:h-64 w-full rounded-xl sm:rounded-2xl mb-5 sm:mb-6 bg-cover bg-center border border-black/10 dark:border-white/10 shadow-inner" style={{backgroundImage:`url(${item.imageUrl})`}}></div>}
-                
-                <p className="line-clamp-3 opacity-80 mb-5 sm:mb-6 text-sm sm:text-base leading-relaxed">{item.translatedContent || item.content}</p>
-                
-                {item.type === 'activity' && (
-                    <div className={`mb-5 sm:mb-6 p-4 sm:p-5 rounded-xl sm:rounded-2xl border grid gap-3 sm:gap-4 grid-cols-2 ${darkMode ? 'bg-black/30 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
-                        <div><span className="text-[9px] sm:text-[10px] font-black tracking-widest uppercase opacity-50 block mb-0.5 sm:mb-1">{t.dateTime}</span><span className="font-bold text-blue-500 text-xs sm:text-sm">{formatEventDateTime(item)}</span></div>
-                        {item.maxSpots !== undefined && (
-                            <div>
-                                <span className="text-[9px] sm:text-[10px] font-black tracking-widest uppercase opacity-50 block mb-0.5 sm:mb-1">{t.spots}</span>
-                                <span className="font-bold text-xs sm:text-sm">
-                                    {item.isTeamEvent ? item.teams?.length || 0 : item.attendees?.length || 0} / {item.maxSpots === 0 ? <span className="text-green-500">{t.unlimited}</span> : item.maxSpots}
-                                </span>
-                            </div>
-                        )}
+          <div className="space-y-6">
+              {filteredFeed.map(item => (
+                <div key={item.id} onClick={() => setSelectedPost(item)} className={`rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden border backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 sm:hover:-translate-y-1.5 hover:shadow-2xl cursor-pointer ${cardBg}`}>
+                  <div className="p-6 sm:p-8">
+                    <div className="flex gap-4 sm:gap-5 items-start mb-5 sm:mb-6">
+                      {item.type === 'activity' && item.date ? (
+                         <div className={`text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl flex flex-col items-center shadow-lg border bg-gradient-to-br from-red-500 to-rose-600 border-red-400/30 shrink-0 transform transition-transform group-hover:scale-105`}>
+                            <span className="text-xl sm:text-2xl font-black leading-none mb-1">{new Date(item.date).getDate()}</span>
+                            <span className="text-[9px] sm:text-[10px] font-black uppercase">{new Date(item.date).toLocaleString(currentLang, {month:'short'})}</span>
+                         </div>
+                      ) : (
+                         <div className="w-12 h-12 sm:w-14 sm:h-14 shrink-0 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-2xl shadow-lg flex items-center justify-center border border-blue-400/30 font-black text-xl sm:text-2xl transform transition-transform group-hover:scale-105">📢</div>
+                      )}
+                      <div>
+                        <h2 className="text-lg sm:text-2xl font-black mb-1 leading-tight">{item.translatedTitle || item.title}</h2>
+                        {(item.authorName || item.organizers) && <p className="opacity-60 text-[10px] sm:text-xs font-bold uppercase tracking-widest">{item.authorName || item.organizers || t.council}</p>}
+                      </div>
                     </div>
-                )}
+                    {item.imageUrl && <div className="h-48 sm:h-64 w-full rounded-xl sm:rounded-2xl mb-5 sm:mb-6 bg-cover bg-center border border-black/10 dark:border-white/10 shadow-inner" style={{backgroundImage:`url(${item.imageUrl})`}}></div>}
+                    
+                    <p className="line-clamp-3 opacity-80 mb-5 sm:mb-6 text-sm sm:text-base leading-relaxed">{item.translatedContent || item.content}</p>
+                    
+                    {item.type === 'activity' && (
+                        <div className={`mb-5 sm:mb-6 p-4 sm:p-5 rounded-xl sm:rounded-2xl border grid gap-3 sm:gap-4 grid-cols-2 ${darkMode ? 'bg-black/30 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
+                            <div><span className="text-[9px] sm:text-[10px] font-black tracking-widest uppercase opacity-50 block mb-0.5 sm:mb-1">{t.dateTime}</span><span className="font-bold text-blue-500 text-xs sm:text-sm">{formatEventDateTime(item)}</span></div>
+                            {item.maxSpots !== undefined && (
+                                <div>
+                                    <span className="text-[9px] sm:text-[10px] font-black tracking-widest uppercase opacity-50 block mb-0.5 sm:mb-1">{t.spots}</span>
+                                    <span className="font-bold text-xs sm:text-sm">
+                                        {item.isTeamEvent ? item.teams?.length || 0 : item.attendees?.length || 0} / {item.maxSpots === 0 ? <span className="text-green-500">{t.unlimited}</span> : item.maxSpots}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
-                <div className="flex justify-between items-center pt-5 sm:pt-6 border-t border-black/5 dark:border-white/5">
-                  <div className="flex gap-4">
-                      <button onClick={(e) => handleLike(e, item)} className={`font-bold text-xs sm:text-sm flex items-center gap-2 transition-all p-2 -ml-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 ${item.likes?.includes(user.id) ? 'text-red-500 scale-105' : 'opacity-70 hover:opacity-100'}`}>
-                          <span>{item.likes?.includes(user.id) ? "❤️" : "🤍"}</span> {item.likes?.length || 0}
-                      </button>
+                    <div className="flex justify-between items-center pt-5 sm:pt-6 border-t border-black/5 dark:border-white/5">
+                      <div className="flex gap-4">
+                          <button onClick={(e) => handleLike(e, item)} className={`font-bold text-xs sm:text-sm flex items-center gap-2 transition-all p-2 -ml-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 ${item.likes?.includes(user.id) ? 'text-red-500 scale-105' : 'opacity-70 hover:opacity-100'}`}>
+                              <span>{item.likes?.includes(user.id) ? "❤️" : "🤍"}</span> {item.likes?.length || 0}
+                          </button>
+                      </div>
+                      
+                      {item.type === 'activity' && user?.class !== 'Absolvent' && (
+                        <button onClick={(e) => handleRegisterClick(e, item)} className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all shadow-md ${
+                            (item.isTeamEvent ? item.teams?.some((t:any)=>t.leaderId===user.id || t.members?.some((m:any)=>m.id===user.id)) : item.attendees?.some((a:any)=>a.id===user.id)) 
+                            ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white' 
+                            : 'bg-gradient-to-r from-green-600 to-emerald-500 text-white hover:shadow-green-500/30 hover:-translate-y-0.5 border border-transparent'}`}>
+                          {item.isTeamEvent ? (item.teams?.some((t:any)=>t.leaderId===user.id || t.members?.some((m:any)=>m.id===user.id)) ? t.teamManage : t.teamJoin) : (item.attendees?.some((a:any)=>a.id===user.id) ? t.cancel : t.join)}
+                        </button>
+                      )}
+                      {item.type === 'activity' && user?.class === 'Absolvent' && (
+                         <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-3 py-1.5 rounded-lg border border-red-500/20">Fără acces la înscrieri</span>
+                      )}
+                    </div>
                   </div>
-                  
-                  {/* Ascundem butonul de inscriere daca e Absolvent */}
-                  {item.type === 'activity' && user?.class !== 'Absolvent' && (
-                    <button onClick={(e) => handleRegisterClick(e, item)} className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all shadow-md ${
-                        (item.isTeamEvent ? item.teams?.some((t:any)=>t.leaderId===user.id || t.members?.some((m:any)=>m.id===user.id)) : item.attendees?.some((a:any)=>a.id===user.id)) 
-                        ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white' 
-                        : 'bg-gradient-to-r from-green-600 to-emerald-500 text-white hover:shadow-green-500/30 hover:-translate-y-0.5 border border-transparent'}`}>
-                      {item.isTeamEvent ? (item.teams?.some((t:any)=>t.leaderId===user.id || t.members?.some((m:any)=>m.id===user.id)) ? t.teamManage : t.teamJoin) : (item.attendees?.some((a:any)=>a.id===user.id) ? t.cancel : t.join)}
-                    </button>
-                  )}
-                  {item.type === 'activity' && user?.class === 'Absolvent' && (
-                     <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-3 py-1.5 rounded-lg border border-red-500/20">Fără acces la înscrieri</span>
-                  )}
                 </div>
-              </div>
-            </div>
-          ))}
+              ))}
+          </div>
         </div>
 
         <div className={`p-6 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] lg:sticky lg:top-28 border backdrop-blur-xl h-fit ${cardBg}`}>
@@ -517,9 +522,16 @@ export default function Dashboard() {
                 
                 <button onClick={handleSaveSettings} className="w-full py-3.5 sm:py-4 bg-gradient-to-r from-red-600 to-rose-500 text-white rounded-xl sm:rounded-2xl font-black text-base sm:text-lg hover:shadow-lg hover:shadow-red-500/30 hover:-translate-y-0.5 transition-all">{t.save}</button>
 
-                <button onClick={() => setShowContactAdmin(true)} className={`w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl font-bold text-xs sm:text-sm hover:-translate-y-0.5 transition-all shadow-md border mt-4 ${darkMode ? 'bg-slate-800 text-white hover:bg-slate-700 border-white/10' : 'bg-slate-200 text-slate-800 hover:bg-slate-300 border-slate-300'}`}>
-                    📧 {t.contactAdmin}
-                </button>
+                <div className="grid grid-cols-2 gap-3 mt-4">
+                    <button onClick={() => setShowContactAdmin(true)} className={`w-full py-3 sm:py-3.5 rounded-xl font-bold text-xs hover:-translate-y-0.5 transition-all shadow-md border ${darkMode ? 'bg-slate-800 text-white hover:bg-slate-700 border-white/10' : 'bg-slate-200 text-slate-800 hover:bg-slate-300 border-slate-300'}`}>
+                        📧 {t.contactAdmin}
+                    </button>
+
+                    {/* NOU: Buton de Deconectare in interiorul Setarilor */}
+                    <button onClick={handleSecureLogout} className={`w-full py-3 sm:py-3.5 rounded-xl font-bold text-xs transition-all shadow-md border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white`}>
+                        🚪 {t.logout}
+                    </button>
+                </div>
             </div>
           </div>
         </div>
@@ -741,7 +753,6 @@ export default function Dashboard() {
                 <h2 className="text-xl sm:text-3xl font-black mb-4 sm:mb-6 leading-tight">{selectedPost.translatedTitle || selectedPost.title}</h2>
                 <p className="text-sm sm:text-lg leading-relaxed opacity-90 whitespace-pre-wrap mb-6 sm:mb-8">{selectedPost.translatedContent || selectedPost.content}</p>
                 
-                {/* Ascundem si in modal butonul de inscriere pentru absolventi */}
                 {selectedPost.type === 'activity' && user?.class !== 'Absolvent' && (
                   <button onClick={(e) => handleRegisterClick(e, selectedPost)} className={`w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl font-black text-base sm:text-lg shadow-xl transition-all ${
                         (selectedPost.isTeamEvent ? selectedPost.teams?.some((t:any)=>t.leaderId===user.id || t.members?.some((m:any)=>m.id===user.id)) : selectedPost.attendees?.some((a:any)=>a.id===user.id)) 

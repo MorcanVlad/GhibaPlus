@@ -14,8 +14,9 @@ export default function AdminPanel() {
   const [adminMessages, setAdminMessages] = useState<any[]>([]);
   const [darkMode, setDarkMode] = useState(true);
   
-  // NOU: Urmărim rolul utilizatorului care e conectat (admin sau profesor)
   const [currentUserRole, setCurrentUserRole] = useState<string>("user");
+  // NOU: Salvăm și ID-ul userului curent pentru a-l compara cu authorId la postări
+  const [currentUserId, setCurrentUserId] = useState<string>("");
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -59,6 +60,7 @@ export default function AdminPanel() {
       const snap = await getDoc(doc(db, "users", u.uid));
       if (snap.exists() && (snap.data().role === 'admin' || snap.data().role === 'profesor')) {
           setCurrentUserRole(snap.data().role);
+          setCurrentUserId(u.uid);
           fetchData();
           if(snap.data().role === 'admin') {
               onSnapshot(query(collection(db, "admin_messages"), orderBy("createdAt", "desc")), (s) => {
@@ -151,7 +153,9 @@ export default function AdminPanel() {
   const handleSavePost = async (e: React.FormEvent) => {
     e.preventDefault();
     await addDoc(collection(db, "news"), { 
-        type: "official_news", title, content, imageUrl, authorName: authorName || (currentUserRole === 'profesor' ? "Profesor" : "Consiliul Elevilor"), 
+        type: "official_news", title, content, imageUrl, 
+        authorName: authorName || (currentUserRole === 'profesor' ? "Profesor" : "Consiliul Elevilor"), 
+        authorId: currentUserId, // NOU: Salvăm cine a creat postarea
         targetClasses: selectedClasses.length === 0 ? ["Toată Școala"] : selectedClasses, postedAt: new Date().toISOString(), likes: []
     });
     alert("✅ Știre Publicată!"); resetForm(); fetchData();
@@ -164,6 +168,7 @@ export default function AdminPanel() {
 
     const eventData: any = { 
         type: eventType, title, content, imageUrl, date: finalDateISO, endDate: finalEndDateISO, hasTime, startTime, endTime,
+        authorId: currentUserId, // NOU: Salvăm cine a creat evenimentul
         targetClasses: selectedClasses.length === 0 ? ["Toată Școala"] : selectedClasses, postedAt: new Date().toISOString(), likes: []
     };
 
@@ -234,7 +239,6 @@ export default function AdminPanel() {
       fetchData();
   };
 
-  // NOU: Funcție pentru a schimba rolul utilizatorului (Elev -> Profesor -> Admin)
   const handleUserRoleChange = async (userId: string, newRole: string) => {
       if (!confirm(`Ești sigur că vrei să îi oferi acestui utilizator rolul de ${newRole.toUpperCase()}?`)) return;
       await updateDoc(doc(db, "users", userId), { role: newRole });
@@ -268,7 +272,6 @@ export default function AdminPanel() {
   const cardBg = darkMode ? "bg-slate-900/80 border-white/10 shadow-2xl" : "bg-white border-slate-200 shadow-xl";
   const inputBg = darkMode ? "bg-black/50 border-white/10 text-white placeholder-gray-500" : "bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-500";
 
-  // NOU: Filtram tab-urile pe baza rolului (Profesor vs Admin)
   const allowedTabs = [
       {id:'gestiune', icon:'🗑️', lbl:'Gestiune'},
       ...(currentUserRole === 'admin' ? [{id:'users', icon:'👥', lbl:'Elevi'}] : []),
@@ -299,15 +302,20 @@ export default function AdminPanel() {
             <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
                 <h2 className="text-2xl font-black mb-6">⚙️ Moderează Postările</h2>
                 <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                    {posts.map(p => (
+                    {posts.map(p => {
+                        // NOU: Condiția pentru permisiuni (Admin = Tot, Profesor = Doar ale lui)
+                        const canModify = currentUserRole === 'admin' || (currentUserRole === 'profesor' && p.authorId === currentUserId);
+
+                        return (
                         <div key={p.id} className={`flex justify-between items-center p-5 rounded-2xl border transition-colors ${darkMode ? 'bg-black/40 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
                             <div>
                                 <div className="font-bold mb-1 flex items-center gap-2">
                                     <span className={`text-[10px] uppercase font-black px-2 py-0.5 rounded ${p.type === 'holiday' ? 'bg-yellow-500/20 text-yellow-600' : p.type === 'exam' ? 'bg-purple-500/20 text-purple-500' : (p.type === 'activity' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500')}`}> 
                                         {p.type === 'holiday' ? 'Vacanță' : p.type === 'exam' ? 'Examen' : (p.type === 'activity' ? 'Eveniment' : 'Știre')} 
                                     </span>
-                                    {p.title}
+                                    <span className="line-clamp-1">{p.title}</span>
                                 </div>
+                                <div className="text-[10px] opacity-50 font-mono">Autor: {p.authorName || p.organizers || "Necunoscut"}</div>
                             </div>
                             <div className="flex gap-2 flex-wrap justify-end">
                                 {p.type === 'activity' && (
@@ -315,11 +323,17 @@ export default function AdminPanel() {
                                         👥 ({p.isTeamEvent ? p.teams?.length || 0 : p.attendees?.length || 0})
                                     </button>
                                 )}
-                                <button onClick={() => handleEditClick(p)} className="bg-orange-500/10 text-orange-500 px-4 py-2.5 rounded-xl font-bold hover:bg-orange-600 hover:text-white transition">Editează</button>
-                                <button onClick={() => handleDelete(p.id, p.col)} className="bg-red-500/10 text-red-500 px-4 py-2.5 rounded-xl font-bold hover:bg-red-600 hover:text-white transition">Șterge</button>
+                                
+                                {/* Afișăm butoanele de edit/ștergere doar dacă are voie */}
+                                {canModify && (
+                                    <>
+                                        <button onClick={() => handleEditClick(p)} className="bg-orange-500/10 text-orange-500 px-4 py-2.5 rounded-xl font-bold hover:bg-orange-600 hover:text-white transition">Editează</button>
+                                        <button onClick={() => handleDelete(p.id, p.col)} className="bg-red-500/10 text-red-500 px-4 py-2.5 rounded-xl font-bold hover:bg-red-600 hover:text-white transition">Șterge</button>
+                                    </>
+                                )}
                             </div>
                         </div>
-                    ))}
+                    )})}
                 </div>
             </div>
         )}
