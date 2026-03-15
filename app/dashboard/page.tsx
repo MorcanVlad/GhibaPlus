@@ -47,6 +47,11 @@ export default function Dashboard() {
   const [showContactAdmin, setShowContactAdmin] = useState(false);
   const [contactReason, setContactReason] = useState("Schimbare Clasă");
   const [contactMessage, setContactMessage] = useState("");
+
+  // NOU: Stări pentru pop-up-urile de schimbare clasă / Absolvire
+  const [showClassChangePopup, setShowClassChangePopup] = useState(false);
+  const [showGraduatePopup, setShowGraduatePopup] = useState(false);
+  const [newClassName, setNewClassName] = useState("");
   
   const unsubRefs = useRef<{ notif?: any, news?: any, events?: any, users?: any }>({});
   
@@ -61,8 +66,27 @@ export default function Dashboard() {
       const snap = await getDoc(doc(db, "users", u.uid));
       if (snap.exists()) {
         const userData = { id: u.uid, ...snap.data() };
-        setUser(userData); setEditPhone(userData.phone || ""); setCurrentLang(userData.language || "ro"); setEditLang(userData.language || "ro");
+        setUser(userData); 
+        setEditPhone(userData.phone || ""); 
         
+        // Dacă e absolvent forțăm RO ca să nu cheltuim API (Resurse)
+        const isGraduate = userData.class === "Absolvent";
+        const langToSet = isGraduate ? "ro" : (userData.language || "ro");
+        setCurrentLang(langToSet); setEditLang(langToSet);
+        
+        // NOU: Logica de notificare a schimbării clasei
+        if (userData.lastSeenClass && userData.lastSeenClass !== userData.class) {
+            if (userData.class === "Absolvent") {
+                setShowGraduatePopup(true);
+            } else {
+                setNewClassName(userData.class);
+                setShowClassChangePopup(true);
+            }
+        } else if (!userData.lastSeenClass && userData.class) {
+            // Dacă nu are field-ul setat (cont vechi), îl setăm ca să nu dea popup aiurea
+            await updateDoc(doc(db, "users", u.uid), { lastSeenClass: userData.class });
+        }
+
         unsubRefs.current.notif = onSnapshot(query(collection(db, "users", u.uid, "notifications"), orderBy("sentAt", "desc")), (s) => setNotifications(s.docs.map(d => ({id: d.id, ...d.data()}))));
         unsubRefs.current.news = onSnapshot(collection(db, "news"), (s) => setNews(s.docs.map(d => ({id: d.id, col:'news', ...d.data()}))));
         unsubRefs.current.events = onSnapshot(collection(db, "calendar_events"), (s) => setEvents(s.docs.map(d => ({id: d.id, col:'calendar_events', ...d.data()}))));
@@ -79,6 +103,13 @@ export default function Dashboard() {
     };
   }, [router]);
 
+  // NOU: Funcții pentru a închide pop-up-ul și a salva în baza de date
+  const handleAcknowledgeClassChange = async () => {
+      setShowClassChangePopup(false);
+      setShowGraduatePopup(false);
+      await updateDoc(doc(db, "users", user.id), { lastSeenClass: user.class });
+  };
+
   const handleSecureLogout = async () => {
       if(unsubRefs.current.notif) unsubRefs.current.notif();
       if(unsubRefs.current.news) unsubRefs.current.news();
@@ -88,21 +119,18 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-      if (!user) return; // Asigură-te că user-ul e încărcat pentru a folosi user.class
+      if (!user) return;
       let allItems = [...news, ...events];
       let feedItems = [...allItems].sort((a:any, b:any) => new Date(b.postedAt||b.date||0).getTime() - new Date(a.postedAt||a.date||0).getTime());
       setFeed(feedItems.filter(item => item.type !== 'holiday' && item.type !== 'exam'));
       
       let calItems = allItems.filter(item => item.col === 'calendar_events');
       const today = new Date(); today.setHours(0, 0, 0, 0);
-      
-      // AICI ESTE REPARAȚIA PENTRU CALENDAR (Filtrează clasa și data)
       calItems = calItems.filter((item:any) => {
           const validDate = new Date(item.endDate || item.date) >= today;
           const validClass = !item.targetClasses || item.targetClasses.includes("Toată Școala") || item.targetClasses.includes(user.class);
           return validDate && validClass;
       });
-      
       calItems.sort((a:any, b:any) => new Date(a.date||0).getTime() - new Date(b.date||0).getTime());
       setCalendarEvents(calItems);
 
@@ -114,12 +142,13 @@ export default function Dashboard() {
           const updatedEvent = allItems.find(i => i.id === manageTeamModal.id);
           if(updatedEvent) setManageTeamModal((prev:any) => ({...prev, ...updatedEvent}));
       }
-  }, [news, events, user]); // Am adaugat `user` in dependente ca sa poata citi `user.class`
+  }, [news, events, user]);
 
   const t = TRANSLATIONS[currentLang] || TRANSLATIONS["ro"];
 
   const translateText = async (text: string, targetLang: string) => {
-    if (!text || typeof text !== 'string' || text.trim() === '' || targetLang === 'ro') return text || "";
+    // BLOCAJ API PENTRU ABSOLVENTI!
+    if (user?.class === "Absolvent" || !text || typeof text !== 'string' || text.trim() === '' || targetLang === 'ro') return text || "";
     const cacheKey = `${targetLang}_${text}`;
     if (translationCache.current.has(cacheKey)) return translationCache.current.get(cacheKey);
 
@@ -138,7 +167,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     const translateWholePage = async () => {
-      if (currentLang === 'ro' || (feed.length === 0 && calendarEvents.length === 0 && notifications.length === 0)) {
+      // Daca e pe ro sau e Absolvent, nu face NICIUN API call (economie)
+      if (currentLang === 'ro' || user?.class === "Absolvent" || (feed.length === 0 && calendarEvents.length === 0 && notifications.length === 0)) {
         setTranslatedFeed([...feed]); setTranslatedCalendar([...calendarEvents]); setTranslatedNotifications([...notifications]); return;
       }
       setIsTranslating(true);
@@ -164,7 +194,7 @@ export default function Dashboard() {
       setIsTranslating(false);
     };
     translateWholePage();
-  }, [feed, calendarEvents, notifications, currentLang]);
+  }, [feed, calendarEvents, notifications, currentLang, user]);
 
   const handleResetPasswordInApp = async () => {
     if (!confirm("Vrei să îți resetezi parola? Vei primi un email.")) return;
@@ -364,7 +394,11 @@ export default function Dashboard() {
                 <button onClick={() => setShowSettings(true)} className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-transform duration-300 hover:rotate-90 origin-center text-sm sm:text-base">⚙️</button>
 
                 <div className="flex items-center gap-1 sm:gap-2 pl-1 sm:pl-2 border-l border-black/10 dark:border-white/10 ml-0.5 sm:ml-1">
-                    {user.role === 'admin' && <button onClick={() => router.push('/admin')} className="bg-gradient-to-r from-red-600 to-rose-500 text-white px-2.5 py-1 sm:px-4 sm:py-1.5 rounded-full text-[9px] sm:text-[11px] font-black shadow-lg shadow-red-500/20 hover:shadow-red-500/40 hover:-translate-y-0.5 transition-all">ADMIN</button>}
+                    {(user.role === 'admin' || user.role === 'profesor') && (
+                        <button onClick={() => router.push('/admin')} className={`bg-gradient-to-r ${user.role === 'profesor' ? 'from-blue-600 to-indigo-500 shadow-blue-500/20' : 'from-red-600 to-rose-500 shadow-red-500/20'} text-white px-2.5 py-1 sm:px-4 sm:py-1.5 rounded-full text-[9px] sm:text-[11px] font-black shadow-lg hover:-translate-y-0.5 transition-all`}>
+                            {user.role === 'admin' ? 'ADMIN' : 'PROFESOR'}
+                        </button>
+                    )}
                     <button onClick={handleSecureLogout} className="text-[10px] sm:text-xs font-bold opacity-60 hover:opacity-100 hover:text-red-500 transition-colors pr-1 sm:pr-2 hidden sm:block">{t.logout}</button>
                     <button onClick={handleSecureLogout} className="sm:hidden text-lg opacity-60 hover:opacity-100 hover:text-red-500 pr-1" title={t.logout}>🚪</button>
                 </div>
@@ -420,13 +454,18 @@ export default function Dashboard() {
                           <span>{item.likes?.includes(user.id) ? "❤️" : "🤍"}</span> {item.likes?.length || 0}
                       </button>
                   </div>
-                  {item.type === 'activity' && (
+                  
+                  {/* Ascundem butonul de inscriere daca e Absolvent */}
+                  {item.type === 'activity' && user?.class !== 'Absolvent' && (
                     <button onClick={(e) => handleRegisterClick(e, item)} className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all shadow-md ${
                         (item.isTeamEvent ? item.teams?.some((t:any)=>t.leaderId===user.id || t.members?.some((m:any)=>m.id===user.id)) : item.attendees?.some((a:any)=>a.id===user.id)) 
                         ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white' 
                         : 'bg-gradient-to-r from-green-600 to-emerald-500 text-white hover:shadow-green-500/30 hover:-translate-y-0.5 border border-transparent'}`}>
                       {item.isTeamEvent ? (item.teams?.some((t:any)=>t.leaderId===user.id || t.members?.some((m:any)=>m.id===user.id)) ? t.teamManage : t.teamJoin) : (item.attendees?.some((a:any)=>a.id===user.id) ? t.cancel : t.join)}
                     </button>
+                  )}
+                  {item.type === 'activity' && user?.class === 'Absolvent' && (
+                     <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-3 py-1.5 rounded-lg border border-red-500/20">Fără acces la înscrieri</span>
                   )}
                 </div>
               </div>
@@ -458,13 +497,14 @@ export default function Dashboard() {
             <div className="space-y-4 sm:space-y-6">
                 <div>
                     <label className="text-[9px] sm:text-[10px] font-black tracking-widest uppercase opacity-50 mb-1.5 sm:mb-2 block">{t.lang}</label>
-                    <select value={editLang} onChange={e => setEditLang(e.target.value)} className={`w-full p-3.5 sm:p-4 rounded-xl sm:rounded-2xl text-sm sm:text-base font-bold outline-none border focus:border-red-500 transition-colors ${darkMode ? 'bg-black/50 border-white/10' : 'bg-slate-100 border-slate-300'}`}>
+                    <select value={editLang} onChange={e => setEditLang(e.target.value)} disabled={user?.class === 'Absolvent'} className={`w-full p-3.5 sm:p-4 rounded-xl sm:rounded-2xl text-sm sm:text-base font-bold outline-none border transition-colors ${user?.class === 'Absolvent' ? 'opacity-50 cursor-not-allowed' : 'focus:border-red-500'} ${darkMode ? 'bg-black/50 border-white/10' : 'bg-slate-100 border-slate-300'}`}>
                         <option value="ro" className="text-black bg-white">🇷🇴 Română</option>
                         <option value="en" className="text-black bg-white">🇬🇧 English</option>
                         <option value="fr" className="text-black bg-white">🇫🇷 Français</option>
                         <option value="de" className="text-black bg-white">🇩🇪 Deutsch</option>
                         <option value="es" className="text-black bg-white">🇪🇸 Español</option>
                     </select>
+                    {user?.class === 'Absolvent' && <p className="text-[10px] text-red-500 font-bold mt-2">Traducerile au fost dezactivate pentru a economisi resurse API.</p>}
                 </div>
                 <div>
                     <label className="text-[9px] sm:text-[10px] font-black tracking-widest uppercase opacity-50 mb-1.5 sm:mb-2 block">{t.class}</label>
@@ -481,6 +521,43 @@ export default function Dashboard() {
                     📧 {t.contactAdmin}
                 </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL POP-UP SCHIMBARE CLASA */}
+      {showClassChangePopup && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
+          <div className={`w-full max-w-md p-8 sm:p-10 rounded-[2.5rem] border shadow-2xl relative animate-popup flex flex-col items-center text-center ${cardBg}`}>
+            <div className="w-20 h-20 bg-blue-500/20 text-blue-500 rounded-full flex items-center justify-center text-4xl mb-6 shadow-inner border border-blue-500/30">⬆️</div>
+            <h2 className="text-2xl sm:text-3xl font-black mb-2 text-blue-500">Ai avansat!</h2>
+            <p className="text-sm opacity-80 mb-6 leading-relaxed">Administratorul ți-a actualizat statusul școlar. Bine ai venit în noul an pe GhibaPlus!</p>
+            <div className={`px-6 py-4 rounded-2xl border font-black text-xl w-full mb-8 ${darkMode ? 'bg-black/40 border-white/10' : 'bg-slate-100 border-slate-300'}`}>
+                Noua ta clasă:<br/><span className="text-blue-500 text-3xl">{newClassName}</span>
+            </div>
+            <button onClick={handleAcknowledgeClassChange} className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-base hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20">Am înțeles, mulțumesc!</button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL POP-UP ABSOLVIRE */}
+      {showGraduatePopup && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
+          <div className={`w-full max-w-md p-8 sm:p-10 rounded-[2.5rem] border shadow-2xl relative animate-popup flex flex-col items-center text-center ${cardBg}`}>
+            <div className="w-20 h-20 bg-yellow-500/20 text-yellow-500 rounded-full flex items-center justify-center text-4xl mb-6 shadow-inner border border-yellow-500/30">🎓</div>
+            <h2 className="text-2xl sm:text-3xl font-black mb-2 text-yellow-500">Felicitări!</h2>
+            <p className="text-sm font-bold opacity-80 mb-4 leading-relaxed">Ai absolvit oficial și ai devenit membru <span className="text-yellow-500">Ghiba Alumni</span>.</p>
+            
+            <div className={`text-left p-4 rounded-2xl border text-xs opacity-70 mb-8 ${darkMode ? 'bg-black/40 border-white/10' : 'bg-slate-100 border-slate-300'}`}>
+                <p className="mb-2"><strong className="text-red-500">Ce se schimbă?</strong></p>
+                <ul className="list-disc pl-4 space-y-1">
+                    <li>Vei putea urmări în continuare știrile liceului.</li>
+                    <li>Pentru a salva resursele liceului, funcția de traducere automată a fost dezactivată.</li>
+                    <li>Nu mai poți participa activ sau rezerva locuri la evenimentele cu prezență limitată rezervate elevilor curenți.</li>
+                </ul>
+            </div>
+            
+            <button onClick={handleAcknowledgeClassChange} className="w-full py-4 bg-yellow-500 text-black rounded-xl font-black text-base hover:bg-yellow-400 transition-all shadow-lg shadow-yellow-500/20">Confirm și continui ca Absolvent</button>
           </div>
         </div>
       )}
@@ -571,7 +648,7 @@ export default function Dashboard() {
                     
                     {teamSearch.length > 2 && (
                         <div className={`absolute top-full left-0 right-0 mt-2 max-h-40 overflow-y-auto border rounded-xl shadow-xl z-10 ${darkMode ? 'bg-slate-800 border-white/10' : 'bg-white border-slate-200'}`}>
-                            {usersDb.filter(u => u.id !== user.id && (u.name.toLowerCase().includes(teamSearch.toLowerCase()) || u.email.toLowerCase().includes(teamSearch.toLowerCase()))).slice(0, 5).map(u => (
+                            {usersDb.filter(u => u.id !== user.id && u.class !== 'Absolvent' && (u.name.toLowerCase().includes(teamSearch.toLowerCase()) || u.email.toLowerCase().includes(teamSearch.toLowerCase()))).slice(0, 5).map(u => (
                                 <div key={u.id} onClick={()=>addTeamMember(u)} className="p-3 border-b border-black/5 dark:border-white/5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 flex justify-between">
                                     <span className="text-sm font-bold">{u.name}</span> <span className="text-xs opacity-50">{u.class}</span>
                                 </div>
@@ -632,7 +709,7 @@ export default function Dashboard() {
                           
                           {teamSearch.length > 2 && (
                               <div className={`absolute top-full left-0 right-0 mt-2 max-h-40 overflow-y-auto border rounded-xl shadow-xl z-10 ${darkMode ? 'bg-slate-800 border-white/10' : 'bg-white border-slate-200'}`}>
-                                  {usersDb.filter(u => u.id !== user.id && !myTeam.members.find((xm:any)=>xm.id===u.id) && (u.name.toLowerCase().includes(teamSearch.toLowerCase()))).slice(0, 5).map(u => (
+                                  {usersDb.filter(u => u.id !== user.id && u.class !== 'Absolvent' && !myTeam.members.find((xm:any)=>xm.id===u.id) && (u.name.toLowerCase().includes(teamSearch.toLowerCase()))).slice(0, 5).map(u => (
                                       <div key={u.id} onClick={()=>addTeamMemberExisting(u, myTeam)} className="p-3 border-b border-black/5 dark:border-white/5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 flex justify-between">
                                           <span className="text-sm font-bold">{u.name}</span> <span className="text-xs opacity-50">{u.class}</span>
                                       </div>
@@ -664,13 +741,19 @@ export default function Dashboard() {
                 <h2 className="text-xl sm:text-3xl font-black mb-4 sm:mb-6 leading-tight">{selectedPost.translatedTitle || selectedPost.title}</h2>
                 <p className="text-sm sm:text-lg leading-relaxed opacity-90 whitespace-pre-wrap mb-6 sm:mb-8">{selectedPost.translatedContent || selectedPost.content}</p>
                 
-                {selectedPost.type === 'activity' && (
+                {/* Ascundem si in modal butonul de inscriere pentru absolventi */}
+                {selectedPost.type === 'activity' && user?.class !== 'Absolvent' && (
                   <button onClick={(e) => handleRegisterClick(e, selectedPost)} className={`w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl font-black text-base sm:text-lg shadow-xl transition-all ${
                         (selectedPost.isTeamEvent ? selectedPost.teams?.some((t:any)=>t.leaderId===user.id || t.members?.some((m:any)=>m.id===user.id)) : selectedPost.attendees?.some((a:any)=>a.id===user.id)) 
                         ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white' 
                         : 'bg-gradient-to-r from-green-600 to-emerald-500 text-white hover:shadow-green-500/30 hover:-translate-y-0.5'}`}>
                       {selectedPost.isTeamEvent ? (selectedPost.teams?.some((t:any)=>t.leaderId===user.id || t.members?.some((m:any)=>m.id===user.id)) ? t.teamManage : t.teamJoin) : (selectedPost.attendees?.some((a:any)=>a.id===user.id) ? t.cancel : t.join)}
                   </button>
+                )}
+                {selectedPost.type === 'activity' && user?.class === 'Absolvent' && (
+                  <div className="w-full py-4 text-center rounded-2xl bg-red-500/10 text-red-500 border border-red-500/20 font-bold">
+                      Absolvenții nu pot rezerva locuri la evenimentele active.
+                  </div>
                 )}
               </div>
             </div>

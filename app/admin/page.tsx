@@ -14,6 +14,9 @@ export default function AdminPanel() {
   const [adminMessages, setAdminMessages] = useState<any[]>([]);
   const [darkMode, setDarkMode] = useState(true);
   
+  // NOU: Urmărim rolul utilizatorului care e conectat (admin sau profesor)
+  const [currentUserRole, setCurrentUserRole] = useState<string>("user");
+
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -54,11 +57,14 @@ export default function AdminPanel() {
     auth.onAuthStateChanged(async (u) => {
       if (!u) return router.push("/");
       const snap = await getDoc(doc(db, "users", u.uid));
-      if (snap.exists() && snap.data().role === 'admin') {
+      if (snap.exists() && (snap.data().role === 'admin' || snap.data().role === 'profesor')) {
+          setCurrentUserRole(snap.data().role);
           fetchData();
-          onSnapshot(query(collection(db, "admin_messages"), orderBy("createdAt", "desc")), (s) => {
-              setAdminMessages(s.docs.map(d => ({id: d.id, ...d.data()})));
-          });
+          if(snap.data().role === 'admin') {
+              onSnapshot(query(collection(db, "admin_messages"), orderBy("createdAt", "desc")), (s) => {
+                  setAdminMessages(s.docs.map(d => ({id: d.id, ...d.data()})));
+              });
+          }
       }
       else router.push("/dashboard");
     });
@@ -145,7 +151,7 @@ export default function AdminPanel() {
   const handleSavePost = async (e: React.FormEvent) => {
     e.preventDefault();
     await addDoc(collection(db, "news"), { 
-        type: "official_news", title, content, imageUrl, authorName: authorName || "Consiliul Elevilor", 
+        type: "official_news", title, content, imageUrl, authorName: authorName || (currentUserRole === 'profesor' ? "Profesor" : "Consiliul Elevilor"), 
         targetClasses: selectedClasses.length === 0 ? ["Toată Școala"] : selectedClasses, postedAt: new Date().toISOString(), likes: []
     });
     alert("✅ Știre Publicată!"); resetForm(); fetchData();
@@ -162,7 +168,7 @@ export default function AdminPanel() {
     };
 
     if (eventType === 'activity') {
-        eventData.location = evLoc; eventData.organizers = authorName || "Consiliul Elevilor"; eventData.maxSpots = spots;
+        eventData.location = evLoc; eventData.organizers = authorName || (currentUserRole === 'profesor' ? "Profesor" : "Consiliul Elevilor"); eventData.maxSpots = spots;
         eventData.organizerPhone = organizerPhone; 
         if(isTeamEvent) { eventData.isTeamEvent = true; eventData.teamSize = teamSize; eventData.teamRule = teamRule; eventData.teams = []; } 
         else { eventData.attendees = []; }
@@ -221,15 +227,21 @@ export default function AdminPanel() {
 
   const toggleClass = (c: string) => setSelectedClasses(prev => prev.includes(c) ? prev.filter(x=>x!==c) : [...prev, c]);
 
-  // NOU: Funcție pentru schimbarea individuală a clasei unui elev
   const handleUserClassChange = async (userId: string, newClass: string) => {
-      if (!confirm(`Ești sigur că vrei să schimbi clasa acestui elev în ${newClass}?`)) return;
+      if (!confirm(`Ești sigur că vrei să schimbi clasa acestui elev în ${newClass}? (Va fi notificat la logare)`)) return;
       await updateDoc(doc(db, "users", userId), { class: newClass });
       alert("✅ Clasa a fost actualizată!");
       fetchData();
   };
 
-  // NOU: Funcție pentru promovarea în masă a tuturor elevilor
+  // NOU: Funcție pentru a schimba rolul utilizatorului (Elev -> Profesor -> Admin)
+  const handleUserRoleChange = async (userId: string, newRole: string) => {
+      if (!confirm(`Ești sigur că vrei să îi oferi acestui utilizator rolul de ${newRole.toUpperCase()}?`)) return;
+      await updateDoc(doc(db, "users", userId), { role: newRole });
+      alert("✅ Rolul a fost actualizat!");
+      fetchData();
+  };
+
   const handlePromoteAll = async () => {
       if (!confirm("⚠️ ATENȚIE! Această acțiune va avansa toți elevii cu un an (ex: 9 A devine 10 A). Elevii de a 12-a vor deveni 'Absolvenți'. Ești absolut sigur?")) return;
       
@@ -256,19 +268,28 @@ export default function AdminPanel() {
   const cardBg = darkMode ? "bg-slate-900/80 border-white/10 shadow-2xl" : "bg-white border-slate-200 shadow-xl";
   const inputBg = darkMode ? "bg-black/50 border-white/10 text-white placeholder-gray-500" : "bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-500";
 
+  // NOU: Filtram tab-urile pe baza rolului (Profesor vs Admin)
+  const allowedTabs = [
+      {id:'gestiune', icon:'🗑️', lbl:'Gestiune'},
+      ...(currentUserRole === 'admin' ? [{id:'users', icon:'👥', lbl:'Elevi'}] : []),
+      {id:'news', icon:'📢', lbl:'Știri'},
+      {id:'events', icon:'📅', lbl:'Evenimente'},
+      ...(currentUserRole === 'admin' ? [{id:'notif', icon:'🔔', lbl:'Notificări / Inbox'}, {id:'whitelist', icon:'📧', lbl:'Aprobă'}] : [])
+  ];
+
   return (
     <div className={`min-h-screen relative font-sans transition-colors duration-500 p-4 sm:p-8 ${bgMain}`}>
       <style dangerouslySetInnerHTML={{__html: ` @keyframes popupEnter { 0% { transform: scale(0.95) translateY(15px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } } .animate-popup { animation: popupEnter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; } `}} />
       <div className="max-w-6xl mx-auto relative z-10">
         
         <div className={`flex justify-between items-center mb-6 sm:mb-10 p-4 sm:p-6 rounded-[2rem] border backdrop-blur-xl ${cardBg}`}>
-          <h1 className="text-xl sm:text-3xl font-black">Admin <span className="text-red-500">Ghiba+</span></h1>
+          <h1 className="text-xl sm:text-3xl font-black">Admin <span className={currentUserRole === 'profesor' ? 'text-blue-500' : 'text-red-500'}>Ghiba+ {currentUserRole === 'profesor' ? '(Profesor)' : ''}</span></h1>
           <button onClick={() => router.push('/dashboard')} className={`px-4 py-2.5 rounded-xl font-bold transition shadow-md text-xs sm:text-base ${darkMode ? 'bg-white text-black hover:bg-gray-200' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>Înapoi pe Site</button>
         </div>
 
         <div className={`flex gap-2 sm:gap-4 mb-10 p-2 sm:p-3 rounded-3xl border backdrop-blur-md overflow-x-auto custom-scrollbar ${cardBg}`}>
-          {[{id:'gestiune', icon:'🗑️', lbl:'Gestiune'}, {id:'users', icon:'👥', lbl:'Elevi'}, {id:'news', icon:'📢', lbl:'Știri'}, {id:'events', icon:'📅', lbl:'Evenimente'}, {id:'notif', icon:'🔔', lbl:'Notificări / Inbox'}, {id:'whitelist', icon:'📧', lbl:'Aprobă'}].map(t => (
-            <button key={t.id} onClick={()=>handleTabSwitch(t.id)} className={`flex-shrink-0 px-4 sm:flex-1 py-3 sm:py-4 rounded-2xl font-black text-xs sm:text-sm transition-all ${activeTab === t.id ? 'bg-red-600 text-white shadow-lg' : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-60'}`}>
+          {allowedTabs.map(t => (
+            <button key={t.id} onClick={()=>handleTabSwitch(t.id)} className={`flex-shrink-0 px-4 sm:flex-1 py-3 sm:py-4 rounded-2xl font-black text-xs sm:text-sm transition-all ${activeTab === t.id ? (currentUserRole === 'profesor' ? 'bg-blue-600' : 'bg-red-600') + ' text-white shadow-lg' : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-60'}`}>
               {t.icon} <span className="hidden sm:inline">{t.lbl}</span>
             </button>
           ))}
@@ -363,33 +384,45 @@ export default function AdminPanel() {
             </div>
         )}
 
-        {/* --- TAB-UL USERS --- */}
-        {activeTab === "users" && (
+        {/* --- TAB-UL USERS (DOAR ADMIN) --- */}
+        {activeTab === "users" && currentUserRole === 'admin' && (
           <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
                 <h2 className="text-2xl font-black">👥 Gestiune & Istoric Elevi</h2>
                 <button onClick={handlePromoteAll} className="bg-green-600 hover:bg-green-500 text-white px-5 py-3 rounded-xl font-black text-sm transition shadow-lg shadow-green-500/20 whitespace-nowrap">⬆️ Promovează toți elevii (An Nou)</button>
             </div>
             
-            <input placeholder="Caută elev..." className={`w-full p-4 mb-6 rounded-2xl outline-none border focus:border-red-500 ${inputBg}`} value={userSearch} onChange={e => setUserSearch(e.target.value)} />
+            <input placeholder="Caută elev / profesor..." className={`w-full p-4 mb-6 rounded-2xl outline-none border focus:border-red-500 ${inputBg}`} value={userSearch} onChange={e => setUserSearch(e.target.value)} />
             
             <div className="grid gap-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
               {users.filter(u => u.name?.toLowerCase().includes(userSearch.toLowerCase()) || u.email?.toLowerCase().includes(userSearch.toLowerCase())).map(u => (
                 <div key={u.id} className={`p-4 sm:p-6 rounded-2xl border flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 ${darkMode ? 'bg-black/40 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
                   <div>
-                      <p className="font-black text-lg mb-1">{u.name}</p>
-                      <div className="flex items-center gap-3">
+                      <p className="font-black text-lg mb-1 flex items-center gap-2">
+                          {u.name} 
+                          {u.role === 'profesor' && <span className="text-[10px] bg-blue-500/20 text-blue-500 px-2 py-0.5 rounded font-bold uppercase">Profesor</span>}
+                          {u.role === 'admin' && <span className="text-[10px] bg-red-500/20 text-red-500 px-2 py-0.5 rounded font-bold uppercase">Admin</span>}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-3">
                           <p className="text-xs opacity-50 font-mono">{u.email}</p>
-                          {/* NOU: Selector pentru schimbarea clasei direct din listă */}
+                          
+                          {/* Schimbare Clasă */}
                           <select value={u.class || ""} onChange={(e) => handleUserClassChange(u.id, e.target.value)} className={`text-xs p-1.5 rounded-lg border outline-none font-bold ${darkMode ? 'bg-slate-800 text-white border-white/20' : 'bg-white text-black border-slate-300'}`}>
                               <option value="Profesor">Profesor</option>
                               <option value="Absolvent">Absolvent</option>
                               {SCHOOL_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
+
+                          {/* Schimbare Rol de Securitate */}
+                          <select value={u.role || "user"} onChange={(e) => handleUserRoleChange(u.id, e.target.value)} className={`text-xs p-1.5 rounded-lg border outline-none font-bold ${darkMode ? 'bg-slate-800 text-blue-400 border-white/20' : 'bg-white text-blue-600 border-slate-300'}`}>
+                              <option value="user">Rol: Elev</option>
+                              <option value="profesor">Rol: Profesor</option>
+                              <option value="admin">Rol: Admin</option>
+                          </select>
                       </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <button onClick={() => showUserHistory(u)} className="bg-blue-500/10 text-blue-500 px-4 py-2.5 rounded-xl font-bold text-xs hover:bg-blue-500 hover:text-white transition">Vezi Istoric</button>
+                    <button onClick={() => showUserHistory(u)} className="bg-blue-500/10 text-blue-500 px-4 py-2.5 rounded-xl font-bold text-xs hover:bg-blue-500 hover:text-white transition">Istoric</button>
                     <button onClick={() => handleDelete(u.id, 'users')} className="bg-red-500/10 text-red-500 px-4 py-2.5 rounded-xl font-bold text-xs hover:bg-red-500 hover:text-white transition">Șterge</button>
                   </div>
                 </div>
@@ -483,10 +516,9 @@ export default function AdminPanel() {
             </form>
         )}
 
-        {/* --- TAB-UL NOTIFICĂRI & INBOX MESAJE UTILIZATORI --- */}
-        {activeTab === "notif" && (
+        {/* --- TAB-UL NOTIFICĂRI & INBOX MESAJE UTILIZATORI (DOAR ADMIN) --- */}
+        {activeTab === "notif" && currentUserRole === 'admin' && (
             <div className="grid lg:grid-cols-2 gap-8">
-                {/* Partea Stângă: Trimite Notificări Push */}
                 <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
                   <h2 className="text-xl font-black mb-6">📢 Trimite Notificare</h2>
                   <div className="space-y-4">
@@ -500,7 +532,6 @@ export default function AdminPanel() {
                   </div>
                 </div>
 
-                {/* Partea Dreaptă: Inbox Mesaje de la Utilizatori */}
                 <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl flex flex-col ${cardBg}`}>
                     <h2 className="text-xl font-black mb-6 flex items-center gap-2 text-blue-500">📥 Inbox Utilizatori</h2>
                     <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1 max-h-[500px]">
@@ -527,7 +558,8 @@ export default function AdminPanel() {
             </div>
         )}
 
-        {activeTab === "whitelist" && (
+        {/* --- TAB-UL APROBĂRI (DOAR ADMIN) --- */}
+        {activeTab === "whitelist" && currentUserRole === 'admin' && (
             <div className="grid lg:grid-cols-2 gap-8">
                 <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
                     <div className="flex justify-between items-center mb-4">
