@@ -29,12 +29,18 @@ export default function AdminPanel() {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [evLoc, setEvLoc] = useState("");
-  const [spots, setSpots] = useState(30);
+  const [spots, setSpots] = useState(0); 
+  
+  const [isTeamEvent, setIsTeamEvent] = useState(false);
+  const [teamSize, setTeamSize] = useState(2);
+  const [teamRule, setTeamRule] = useState("any");
 
   const [emailList, setEmailList] = useState("");
   const [whitelistSearch, setWhitelistSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");
+  
   const [viewAttendeesModal, setViewAttendeesModal] = useState<any>(null);
+  const [viewUserHistory, setViewUserHistory] = useState<any>(null);
   const [editingPost, setEditingPost] = useState<any>(null);
 
   const router = useRouter();
@@ -59,23 +65,9 @@ export default function AdminPanel() {
     const nSnap = await getDocs(collection(db, "news"));
     const aSnap = await getDocs(collection(db, "calendar_events"));
     
-    const allItems = [
-        ...nSnap.docs.map(d=>({id:d.id, col:'news', ...d.data()})), 
-        ...aSnap.docs.map(d=>({id:d.id, col:'calendar_events', ...d.data()}))
-    ];
-    
+    const allItems = [...nSnap.docs.map(d=>({id:d.id, col:'news', ...d.data()})), ...aSnap.docs.map(d=>({id:d.id, col:'calendar_events', ...d.data()}))];
     allItems.sort((a:any, b:any) => new Date(b.postedAt || b.date || 0).getTime() - new Date(a.postedAt || a.date || 0).getTime());
     setPosts(allItems);
-  };
-
-  const getClientIp = async () => {
-      try {
-          const res = await fetch('https://api.ipify.org?format=json');
-          const data = await res.json();
-          return data.ip;
-      } catch (err) {
-          return "IP_NOT_FOUND";
-      }
   };
 
   const handleDelete = async (id: string, col: string) => {
@@ -84,35 +76,85 @@ export default function AdminPanel() {
     fetchData();
   };
 
-  const handleUpdateUserClass = async (uid: string, newClass: string) => {
-    await updateDoc(doc(db, "users", uid), { class: newClass });
-    alert("✅ Clasa a fost schimbată!");
-    fetchData();
+  // NOU: Funcție globală de resetare a inputurilor 
+  const resetForm = () => {
+      setTitle(""); setContent(""); setImageUrl(""); setAuthorName("");
+      setSelectedClasses([]); setStartDate(""); setEndDate(""); setStartTime("");
+      setEndTime(""); setHasTime(false); setEvLoc(""); setSpots(0);
+      setIsTeamEvent(false); setTeamSize(2); setTeamRule("any");
+      setEditingPost(null);
   };
 
-  const handlePromoteStudents = async () => {
-      if(!confirm("⚠️ EȘTI SIGUR? Această acțiune va avansa toți elevii cu un an (ex: 10B devine 11B). Cei din clasa a 12-a vor primi tag-ul 'Absolvent'.")) return;
+  // NOU: Când schimbi tab-ul, curăță automat inputurile 
+  const handleTabSwitch = (tabId: string) => {
+      setActiveTab(tabId);
+      resetForm();
+  };
+
+  const handleEditClick = (post: any) => {
+      setEditingPost(post);
+      setTitle(post.title || ""); setContent(post.content || ""); setImageUrl(post.imageUrl || "");
+      setAuthorName(post.authorName || post.organizers || ""); setSelectedClasses(post.targetClasses || ["Toată Școala"]);
       
-      let count = 0;
-      for (const u of users) {
-          if (!u.class || u.class === 'Absolvent') continue;
+      if(post.col === 'calendar_events') {
+          setEventType(post.type); setStartDate(post.date?.split('T')[0] || ""); setEndDate(post.endDate?.split('T')[0] || "");
+          setHasTime(post.hasTime || false); setStartTime(post.startTime || ""); setEndTime(post.endTime || "");
+          setEvLoc(post.location || ""); setSpots(post.maxSpots || 0);
+          setIsTeamEvent(post.isTeamEvent || false); setTeamSize(post.teamSize || 2); setTeamRule(post.teamRule || "any");
+      }
+  };
+
+  const handleUpdatePost = async (e: React.FormEvent) => {
+      e.preventDefault();
+      const updatedData: any = { title, content, imageUrl, targetClasses: selectedClasses.length === 0 ? ["Toată Școala"] : selectedClasses };
+      
+      if (editingPost.col === 'news') {
+          updatedData.authorName = authorName;
+      } else {
+          const finalDateISO = startDate ? (hasTime && startTime ? `${startDate}T${startTime}` : `${startDate}T00:00:00`) : new Date().toISOString();
+          const finalEndDateISO = endDate ? (hasTime && endTime ? `${endDate}T${endTime}` : `${endDate}T00:00:00`) : finalDateISO;
           
-          const match = u.class.match(/(\d+)(.*)/);
-          if (match) {
-              const currentGrade = parseInt(match[1]);
-              const letters = match[2];
-              
-              if (currentGrade === 12) {
-                  await updateDoc(doc(db, "users", u.id), { class: "Absolvent" });
-              } else if (currentGrade >= 5 && currentGrade < 12) {
-                  const nextGrade = currentGrade + 1;
-                  await updateDoc(doc(db, "users", u.id), { class: `${nextGrade}${letters}` });
-              }
-              count++;
+          updatedData.type = eventType; updatedData.date = finalDateISO; updatedData.endDate = finalEndDateISO;
+          updatedData.hasTime = hasTime; updatedData.startTime = startTime; updatedData.endTime = endTime;
+          
+          if(eventType === 'activity') {
+              updatedData.location = evLoc; updatedData.organizers = authorName; updatedData.maxSpots = spots;
+              updatedData.isTeamEvent = isTeamEvent;
+              if(isTeamEvent) { updatedData.teamSize = teamSize; updatedData.teamRule = teamRule; }
           }
       }
-      alert(`✅ Anul școlar a fost avansat pentru ${count} elevi!`);
-      fetchData();
+
+      await updateDoc(doc(db, editingPost.col, editingPost.id), updatedData);
+      alert("✅ Modificările au fost salvate!");
+      resetForm(); fetchData(); // Golim automat cand e gata
+  };
+
+  const handleSavePost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await addDoc(collection(db, "news"), { 
+        type: "official_news", title, content, imageUrl, authorName: authorName || "Consiliul Elevilor", 
+        targetClasses: selectedClasses.length === 0 ? ["Toată Școala"] : selectedClasses, postedAt: new Date().toISOString(), likes: []
+    });
+    alert("✅ Știre Publicată!"); resetForm(); fetchData();
+  };
+
+  const handleSaveActivity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const finalDateISO = startDate ? (hasTime && startTime ? `${startDate}T${startTime}` : `${startDate}T00:00:00`) : new Date().toISOString();
+    const finalEndDateISO = endDate ? (hasTime && endTime ? `${endDate}T${endTime}` : `${endDate}T00:00:00`) : finalDateISO;
+
+    const eventData: any = { 
+        type: eventType, title, content, imageUrl, date: finalDateISO, endDate: finalEndDateISO, hasTime, startTime, endTime,
+        targetClasses: selectedClasses.length === 0 ? ["Toată Școala"] : selectedClasses, postedAt: new Date().toISOString(), likes: []
+    };
+
+    if (eventType === 'activity') {
+        eventData.location = evLoc; eventData.organizers = authorName || "Consiliul Elevilor"; eventData.maxSpots = spots;
+        if(isTeamEvent) { eventData.isTeamEvent = true; eventData.teamSize = teamSize; eventData.teamRule = teamRule; eventData.teams = []; } 
+        else { eventData.attendees = []; }
+    }
+    await addDoc(collection(db, "calendar_events"), eventData);
+    alert("✅ Salvat cu succes în Calendar!"); resetForm(); fetchData();
   };
 
   const handleSendNotif = async () => {
@@ -124,83 +166,7 @@ export default function AdminPanel() {
     for (const u of targetUsers) {
       await addDoc(collection(db, "users", u.id, "notifications"), { title: notifTitle, message: notifBody, sentAt: new Date().toISOString(), read: false });
     }
-    alert("🚀 Notificări trimise cu succes!");
-    setNotifTitle(""); setNotifBody("");
-  };
-
-  const handleNotifyAttendees = async (activity: any) => {
-      const msg = prompt(`Mesaj pentru ${activity.attendees?.length || 0} înscriși la "${activity.title}":`);
-      if(!msg) return;
-      for(const attendee of activity.attendees) {
-          await addDoc(collection(db, "users", attendee.id, "notifications"), { title: `Atenție: ${activity.title}`, message: msg, sentAt: new Date().toISOString(), read: false });
-      }
-      alert("✅ Mesaj trimis participanților!");
-  };
-
-  const handleSavePost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const ip = await getClientIp();
-
-    await addDoc(collection(db, "news"), { 
-        type: "official_news", title, content, imageUrl, 
-        authorName: authorName || "Consiliul Elevilor", 
-        targetClasses: selectedClasses.length === 0 ? ["Toată Școala"] : selectedClasses, 
-        postedAt: new Date().toISOString(), likes: [],
-        uploaderIp: ip
-    });
-
-    alert("✅ Postare Publicată!"); setTitle(""); setContent(""); setImageUrl(""); setAuthorName(""); setSelectedClasses([]); fetchData();
-  };
-
-  const handleSaveActivity = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const ip = await getClientIp();
-
-    const finalDateISO = startDate ? (hasTime && startTime ? `${startDate}T${startTime}` : `${startDate}T00:00:00`) : new Date().toISOString();
-    const finalEndDateISO = endDate ? (hasTime && endTime ? `${endDate}T${endTime}` : `${endDate}T00:00:00`) : finalDateISO;
-
-    const eventData: any = { 
-        type: eventType, title, content, imageUrl, 
-        date: finalDateISO, endDate: finalEndDateISO, hasTime, startTime, endTime,
-        targetClasses: selectedClasses.length === 0 ? ["Toată Școala"] : selectedClasses, 
-        postedAt: new Date().toISOString(), likes: [],
-        uploaderIp: ip
-    };
-
-    if (eventType === 'activity') {
-        eventData.location = evLoc;
-        eventData.organizers = authorName || "Consiliul Elevilor";
-        eventData.maxSpots = spots;
-        eventData.attendees = [];
-    }
-
-    await addDoc(collection(db, "calendar_events"), eventData);
-    alert("✅ Salvat cu succes în Calendar!"); 
-    setTitle(""); setContent(""); setImageUrl(""); setAuthorName(""); 
-    setStartDate(""); setEndDate(""); setHasTime(false); setStartTime(""); setEndTime("");
-    setEvLoc(""); setSelectedClasses([]); setEventType("activity"); fetchData();
-  };
-
-  const handleUpdateEditingPost = async () => {
-      try {
-          const refDoc = doc(db, editingPost.col, editingPost.id);
-          const dataToUpdate = {
-              title: editingPost.title,
-              content: editingPost.content,
-              imageUrl: editingPost.imageUrl || ""
-          };
-          if (editingPost.col === 'calendar_events' && editingPost.type === 'activity') {
-              (dataToUpdate as any).location = editingPost.location;
-              (dataToUpdate as any).maxSpots = editingPost.maxSpots;
-          }
-          await updateDoc(refDoc, dataToUpdate);
-          alert("✅ Postare actualizată!");
-          setEditingPost(null);
-          fetchData();
-      } catch (err) {
-          console.error(err);
-          alert("Eroare la actualizare.");
-      }
+    alert("🚀 Notificări trimise cu succes!"); setNotifTitle(""); setNotifBody("");
   };
 
   const handleAddWhitelist = async () => {
@@ -214,21 +180,29 @@ export default function AdminPanel() {
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const file = e.target.files?.[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => setEmailList(prev => prev ? prev + '\n' + (event.target?.result as string) : (event.target?.result as string));
     reader.readAsText(file); e.target.value = "";
   };
 
-  const downloadAttendeesCSV = (activity: any) => {
-      if (!activity.attendees || activity.attendees.length === 0) return alert("Nu există înscriși!");
-      const header = "Nume Elev,Clasa,Numar Telefon\n";
-      const rows = activity.attendees.map((a:any) => `${a.name},${a.class},${a.phone}`).join("\n");
-      const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a"); link.setAttribute("href", url); link.setAttribute("download", `Inscrisi_${activity.title.replace(/\s+/g, '_')}.csv`);
-      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  const showUserHistory = (userItem: any) => {
+      const history = posts.filter(p => p.col === 'calendar_events' && p.type === 'activity').filter(p => {
+          if (p.isTeamEvent && p.teams) { return p.teams.some((t:any) => t.leaderId === userItem.id || t.members?.some((m:any) => m.id === userItem.id)); } 
+          else if (p.attendees) { return p.attendees.some((a:any) => a.id === userItem.id); } return false;
+      }).map(p => {
+          let joinedAt = "Necunoscut"; let role = "Participant";
+          if (p.isTeamEvent) {
+              const team = p.teams.find((t:any) => t.leaderId === userItem.id || t.members?.some((m:any) => m.id === userItem.id));
+              joinedAt = team?.registeredAt ? new Date(team.registeredAt).toLocaleString('ro-RO') : joinedAt;
+              if(team?.leaderId === userItem.id) role = "Lider Echipă"; else role = "Membru Echipă";
+          } else {
+              const att = p.attendees.find((a:any) => a.id === userItem.id);
+              joinedAt = att?.joinedAt ? new Date(att.joinedAt).toLocaleString('ro-RO') : joinedAt;
+          }
+          return { eventTitle: p.title, date: joinedAt, role };
+      });
+      setViewUserHistory({ ...userItem, history });
   };
 
   const toggleClass = (c: string) => setSelectedClasses(prev => prev.includes(c) ? prev.filter(x=>x!==c) : [...prev, c]);
@@ -239,20 +213,17 @@ export default function AdminPanel() {
 
   return (
     <div className={`min-h-screen relative font-sans transition-colors duration-500 p-4 sm:p-8 ${bgMain}`}>
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className={`absolute -top-[10%] left-[10%] w-[40%] h-[40%] rounded-full blur-[150px] ${darkMode ? 'bg-blue-900/20' : 'bg-blue-200/40'}`}></div>
-        <div className={`absolute bottom-[10%] right-[10%] w-[50%] h-[50%] rounded-full blur-[150px] ${darkMode ? 'bg-red-900/20' : 'bg-red-200/40'}`}></div>
-      </div>
-
+      <style dangerouslySetInnerHTML={{__html: ` @keyframes popupEnter { 0% { transform: scale(0.95) translateY(15px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } } .animate-popup { animation: popupEnter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; } `}} />
       <div className="max-w-6xl mx-auto relative z-10">
+        
         <div className={`flex justify-between items-center mb-6 sm:mb-10 p-4 sm:p-6 rounded-[2rem] border backdrop-blur-xl ${cardBg}`}>
           <h1 className="text-xl sm:text-3xl font-black">Admin <span className="text-red-500">Ghiba+</span></h1>
-          <button onClick={() => router.push('/dashboard')} className={`px-4 sm:px-6 py-2.5 rounded-xl font-bold transition shadow-md text-xs sm:text-base ${darkMode ? 'bg-white text-black hover:bg-gray-200' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>Înapoi pe Site</button>
+          <button onClick={() => router.push('/dashboard')} className={`px-4 py-2.5 rounded-xl font-bold transition shadow-md text-xs sm:text-base ${darkMode ? 'bg-white text-black hover:bg-gray-200' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>Înapoi pe Site</button>
         </div>
 
         <div className={`flex gap-2 sm:gap-4 mb-10 p-2 sm:p-3 rounded-3xl border backdrop-blur-md overflow-x-auto custom-scrollbar ${cardBg}`}>
-          {[{id:'gestiune', icon:'🗑️', lbl:'Gestiune'}, {id:'users', icon:'👥', lbl:'Elevi'}, {id:'news', icon:'📢', lbl:'Postează'}, {id:'events', icon:'📅', lbl:'Eveniment'}, {id:'notif', icon:'🔔', lbl:'Notificări'}, {id:'whitelist', icon:'📧', lbl:'Aprobă'}].map(t => (
-            <button key={t.id} onClick={()=>setActiveTab(t.id)} className={`flex-shrink-0 px-4 sm:flex-1 py-3 sm:py-4 rounded-2xl font-black text-xs sm:text-sm transition-all ${activeTab === t.id ? 'bg-red-600 text-white shadow-lg' : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-60'}`}>
+          {[{id:'gestiune', icon:'🗑️', lbl:'Gestiune'}, {id:'users', icon:'👥', lbl:'Elevi/Istoric'}, {id:'news', icon:'📢', lbl:'Știri'}, {id:'events', icon:'📅', lbl:'Evenimente'}, {id:'notif', icon:'🔔', lbl:'Notificări'}, {id:'whitelist', icon:'📧', lbl:'Aprobă'}].map(t => (
+            <button key={t.id} onClick={()=>handleTabSwitch(t.id)} className={`flex-shrink-0 px-4 sm:flex-1 py-3 sm:py-4 rounded-2xl font-black text-xs sm:text-sm transition-all ${activeTab === t.id ? 'bg-red-600 text-white shadow-lg' : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-60'}`}>
               {t.icon} <span className="hidden sm:inline">{t.lbl}</span>
             </button>
           ))}
@@ -260,31 +231,25 @@ export default function AdminPanel() {
 
         {activeTab === "gestiune" && (
             <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
-                <h2 className="text-2xl font-black mb-6">🗑️ Moderează Postările</h2>
+                <h2 className="text-2xl font-black mb-6">⚙️ Moderează Postările</h2>
                 <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                     {posts.map(p => (
-                        <div key={p.id} className={`flex justify-between items-center p-5 rounded-2xl border transition-colors ${darkMode ? 'bg-black/40 border-white/5 hover:border-white/10' : 'bg-slate-50 border-slate-200 hover:border-slate-300'}`}>
+                        <div key={p.id} className={`flex justify-between items-center p-5 rounded-2xl border transition-colors ${darkMode ? 'bg-black/40 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
                             <div>
                                 <div className="font-bold mb-1 flex items-center gap-2">
-                                    <span className={`text-[10px] uppercase font-black px-2 py-0.5 rounded ${
-                                        p.type === 'holiday' ? 'bg-yellow-500/20 text-yellow-600' : 
-                                        p.type === 'exam' ? 'bg-purple-500/20 text-purple-500' : 
-                                        (p.type === 'activity' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500')
-                                    }`}> 
-                                        {p.type === 'holiday' ? 'Vacanță' : p.type === 'exam' ? 'Examen' : (p.type === 'activity' ? 'Eveniment' : 'Anunț')} 
+                                    <span className={`text-[10px] uppercase font-black px-2 py-0.5 rounded ${p.type === 'holiday' ? 'bg-yellow-500/20 text-yellow-600' : p.type === 'exam' ? 'bg-purple-500/20 text-purple-500' : (p.type === 'activity' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500')}`}> 
+                                        {p.type === 'holiday' ? 'Vacanță' : p.type === 'exam' ? 'Examen' : (p.type === 'activity' ? 'Eveniment' : 'Știre')} 
                                     </span>
-                                    {p.title} <span className={`text-xs font-normal opacity-60`}>{p.authorName || p.organizers ? `(${p.authorName || p.organizers})` : ''}</span>
+                                    {p.title}
                                 </div>
-                                <div className={`text-xs line-clamp-1 opacity-60`}>{p.content}</div>
-                                {p.uploaderIp && <div className="text-[10px] font-mono opacity-30 mt-1">IP: {p.uploaderIp}</div>}
                             </div>
                             <div className="flex gap-2 flex-wrap justify-end">
                                 {p.type === 'activity' && (
                                     <button onClick={() => setViewAttendeesModal(p)} className="bg-blue-500/10 text-blue-500 px-4 py-2.5 rounded-xl font-bold hover:bg-blue-600 hover:text-white transition">
-                                        👥 ({p.attendees?.length || 0})
+                                        👥 ({p.isTeamEvent ? p.teams?.length || 0 : p.attendees?.length || 0})
                                     </button>
                                 )}
-                                <button onClick={() => setEditingPost(p)} className="bg-yellow-500/10 text-yellow-600 px-4 py-2.5 rounded-xl font-bold hover:bg-yellow-500 hover:text-white transition">Editează</button>
+                                <button onClick={() => handleEditClick(p)} className="bg-orange-500/10 text-orange-500 px-4 py-2.5 rounded-xl font-bold hover:bg-orange-600 hover:text-white transition">Editează</button>
                                 <button onClick={() => handleDelete(p.id, p.col)} className="bg-red-500/10 text-red-500 px-4 py-2.5 rounded-xl font-bold hover:bg-red-600 hover:text-white transition">Șterge</button>
                             </div>
                         </div>
@@ -293,176 +258,132 @@ export default function AdminPanel() {
             </div>
         )}
 
+        {/* --- MODAL DE EDITARE POSTARE --- */}
         {editingPost && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-                <div className={`border p-8 rounded-[2.5rem] w-full max-w-2xl shadow-2xl relative overflow-y-auto max-h-[90vh] custom-scrollbar ${darkMode ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200 text-slate-900'}`}>
-                    <button onClick={() => setEditingPost(null)} className={`absolute top-6 right-6 w-8 h-8 rounded-full flex items-center justify-center font-bold transition ${darkMode ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-900'}`}>✕</button>
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto custom-scrollbar animate-popup">
+                <form onSubmit={handleUpdatePost} className={`border p-8 rounded-[2.5rem] w-full max-w-3xl shadow-2xl relative my-auto ${cardBg}`}>
+                    <button type="button" onClick={() => setEditingPost(null)} className="absolute top-6 right-6 w-8 h-8 bg-black/10 dark:bg-white/10 rounded-full font-bold">✕</button>
+                    <h2 className="text-2xl font-black mb-6 text-orange-500">✏️ Editează Postarea</h2>
                     
-                    <h2 className="text-2xl font-black mb-6">✏️ Editează Postarea</h2>
+                    <div className="grid sm:grid-cols-2 gap-4 mb-4">
+                        <input placeholder="Titlu Postare" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={title} onChange={e=>setTitle(e.target.value)} required />
+                        <input placeholder="Autor / Organizator" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={authorName} onChange={e=>setAuthorName(e.target.value)} />
+                    </div>
+                    <textarea placeholder="Conținutul..." className={`w-full p-4 rounded-2xl outline-none border h-32 resize-none mb-4 ${inputBg}`} value={content} onChange={e=>setContent(e.target.value)} required />
                     
-                    <div className="space-y-4">
-                        <div>
-                            <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Titlu</label>
-                            <input className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={editingPost.title} onChange={e=>setEditingPost({...editingPost, title: e.target.value})} />
-                        </div>
-                        
-                        <div>
-                            <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Conținut</label>
-                            <textarea className={`w-full p-4 rounded-2xl outline-none border h-32 resize-none ${inputBg}`} value={editingPost.content} onChange={e=>setEditingPost({...editingPost, content: e.target.value})} />
-                        </div>
-                        
-                        <div>
-                            <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Link Imagine Copertă (URL)</label>
-                            <input className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={editingPost.imageUrl || ""} onChange={e=>setEditingPost({...editingPost, imageUrl: e.target.value})} />
-                        </div>
+                    <div className="mb-6">
+                        <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Imagine Copertă (URL Extern)</label>
+                        <input value={imageUrl} onChange={e=>setImageUrl(e.target.value)} className={`w-full p-4 rounded-xl border ${inputBg}`} />
+                    </div>
 
-                        {editingPost.col === 'calendar_events' && editingPost.type === 'activity' && (
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Locație</label>
-                                    <input className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={editingPost.location || ""} onChange={e=>setEditingPost({...editingPost, location: e.target.value})} />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Locuri</label>
-                                    <input type="number" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={editingPost.maxSpots || 0} onChange={e=>setEditingPost({...editingPost, maxSpots: Number(e.target.value)})} />
-                                </div>
+                    {editingPost.col === 'calendar_events' && (
+                        <div className="animate-fade-in border-t border-white/10 pt-6 mt-6">
+                            <div className="grid sm:grid-cols-2 gap-4 mb-4">
+                                <div><label className="text-[10px] font-black uppercase opacity-50 block mb-2">Din data</label><input type="date" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={startDate} onChange={e=>setStartDate(e.target.value)} required /></div>
+                                <div><label className="text-[10px] font-black uppercase opacity-50 block mb-2">Până în data</label><input type="date" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={endDate} onChange={e=>setEndDate(e.target.value)} /></div>
                             </div>
-                        )}
-
-                        <button onClick={handleUpdateEditingPost} className="w-full py-4 mt-4 bg-yellow-500 text-white rounded-2xl font-black text-lg hover:bg-yellow-400 transition shadow-lg shadow-yellow-500/20">
-                            Salvează Modificările
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {viewAttendeesModal && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-                <div className={`border p-8 rounded-[2.5rem] w-full max-w-2xl shadow-2xl relative overflow-hidden ${darkMode ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200 text-slate-900'}`}>
-                    <button onClick={() => setViewAttendeesModal(null)} className={`absolute top-6 right-6 w-8 h-8 rounded-full flex items-center justify-center font-bold transition ${darkMode ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-900'}`}>✕</button>
-                    <h2 className="text-2xl font-black mb-1">Lista Participanți</h2>
-                    <p className="text-xs text-green-500 font-bold uppercase tracking-wider mb-6">{viewAttendeesModal.title}</p>
-                    
-                    <div className="max-h-[50vh] overflow-y-auto mb-6 pr-2 space-y-2 custom-scrollbar">
-                        {(!viewAttendeesModal.attendees || viewAttendeesModal.attendees.length === 0) ? (
-                            <p className="text-sm italic opacity-60">Nu s-a înscris niciun elev încă.</p>
-                        ) : (
-                            viewAttendeesModal.attendees.map((a:any, index:number) => (
-                                <div key={a.id} className={`flex justify-between items-center p-4 rounded-xl border ${darkMode ? 'bg-black/40 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
-                                    <div className="font-bold text-sm">{index + 1}. {a.name} <span className={`px-2 py-0.5 ml-2 rounded text-[10px] ${darkMode ? 'bg-white/10 text-gray-300' : 'bg-slate-200 text-slate-700'}`}>{a.class}</span></div>
-                                    <div className="text-sm font-mono opacity-60">{a.phone}</div>
+                            
+                            <label className="flex items-center gap-3 cursor-pointer mb-4">
+                                <input type="checkbox" checked={hasTime} onChange={e=>setHasTime(e.target.checked)} className="w-5 h-5 accent-orange-500 cursor-pointer rounded" />
+                                <span className="font-bold text-sm">⏰ Are oră specifică</span>
+                            </label>
+                            {hasTime && (
+                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                    <input type="time" className={`w-full p-3 rounded-xl border ${inputBg}`} value={startTime} onChange={e=>setStartTime(e.target.value)} required />
+                                    <input type="time" className={`w-full p-3 rounded-xl border ${inputBg}`} value={endTime} onChange={e=>setEndTime(e.target.value)} />
                                 </div>
-                            ))
-                        )}
-                    </div>
-                    <button onClick={() => downloadAttendeesCSV(viewAttendeesModal)} disabled={!viewAttendeesModal.attendees || viewAttendeesModal.attendees.length === 0} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-blue-500 transition shadow-xl disabled:opacity-50">
-                        Descarcă Lista (CSV)
-                    </button>
-                </div>
+                            )}
+
+                            {eventType === 'activity' && (
+                                <div className="grid sm:grid-cols-2 gap-4 mb-6">
+                                    <div><label className="text-[10px] font-black uppercase opacity-50 block mb-2">LOCAȚIE</label><input className={`w-full p-4 rounded-2xl border ${inputBg}`} value={evLoc} onChange={e=>setEvLoc(e.target.value)} required /></div>
+                                    <div><label className="text-[10px] font-black uppercase opacity-50 block mb-2">LOCURI (0 = Nelimitat)</label><input type="number" min="0" className={`w-full p-4 rounded-2xl border ${inputBg}`} value={spots} onChange={e=>setSpots(Number(e.target.value))} required /></div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <p className="text-[10px] font-black tracking-widest text-orange-500 uppercase mb-3 mt-4">Afișează Doar Pentru</p>
+                    <div className="flex flex-wrap gap-2 mb-6">{SCHOOL_CLASSES.map(c => <button key={c} type="button" onClick={() => toggleClass(c)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${selectedClasses.includes(c) ? 'bg-orange-600 border-orange-500 text-white' : `${darkMode?'bg-white/5 border-white/10 text-gray-400':'bg-slate-100 border-slate-200 text-slate-600'}`}`}>{c}</button>)}</div>
+
+                    <button type="submit" className="w-full py-4 bg-orange-600 text-white rounded-2xl font-black text-lg hover:bg-orange-500 transition shadow-lg">Salvează Modificările</button>
+                </form>
             </div>
         )}
 
         {activeTab === "users" && (
           <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
-            <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-                <h2 className="text-2xl font-black">👥 Gestiune Elevi</h2>
-                <button onClick={handlePromoteStudents} className="bg-purple-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-purple-500 transition shadow-lg text-sm w-full sm:w-auto">🎓 Avansare An Școlar</button>
-            </div>
-            
-            <input placeholder="Caută elev după nume sau email..." className={`w-full p-4 mb-6 rounded-2xl outline-none border focus:border-red-500 transition-colors ${inputBg}`} value={userSearch} onChange={e => setUserSearch(e.target.value)} />
-
+            <h2 className="text-2xl font-black mb-6">👥 Gestiune & Istoric Elevi</h2>
+            <input placeholder="Caută elev..." className={`w-full p-4 mb-6 rounded-2xl outline-none border focus:border-red-500 ${inputBg}`} value={userSearch} onChange={e => setUserSearch(e.target.value)} />
             <div className="grid gap-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
               {users.filter(u => u.name?.toLowerCase().includes(userSearch.toLowerCase()) || u.email?.toLowerCase().includes(userSearch.toLowerCase())).map(u => (
                 <div key={u.id} className={`p-4 sm:p-6 rounded-2xl border flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 ${darkMode ? 'bg-black/40 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
-                  <div>
-                    <p className="font-black text-lg">{u.name}</p>
-                    <p className="text-xs opacity-50 font-mono mt-1">{u.email}</p>
-                  </div>
+                  <div><p className="font-black text-lg">{u.name}</p><p className="text-xs opacity-50 font-mono mt-1">{u.email}</p></div>
                   <div className="flex items-center gap-3">
-                    <select value={u.class} onChange={(e) => handleUpdateUserClass(u.id, e.target.value)} className={`px-4 py-2.5 rounded-xl font-black text-xs outline-none border cursor-pointer ${inputBg}`}>
-                      <option value="" className="text-black bg-white">Alege</option>
-                      <option value="Absolvent" className="text-black bg-white">Absolvent</option>
-                      {SCHOOL_CLASSES.map(c => <option key={c} value={c} className="text-black bg-white">{c}</option>)}
-                    </select>
+                    <button onClick={() => showUserHistory(u)} className="bg-blue-500/10 text-blue-500 px-4 py-2.5 rounded-xl font-bold text-xs hover:bg-blue-500 hover:text-white transition">Vezi Istoric</button>
                     <button onClick={() => handleDelete(u.id, 'users')} className="bg-red-500/10 text-red-500 px-4 py-2.5 rounded-xl font-bold text-xs hover:bg-red-500 hover:text-white transition">Șterge</button>
                   </div>
                 </div>
               ))}
-              {users.filter(u => u.name?.toLowerCase().includes(userSearch.toLowerCase()) || u.email?.toLowerCase().includes(userSearch.toLowerCase())).length === 0 && (
-                  <p className="text-center opacity-50 italic mt-4">Niciun elev găsit.</p>
-              )}
             </div>
           </div>
         )}
 
         {activeTab === "news" && (
             <form onSubmit={handleSavePost} className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
-                <h2 className="text-2xl font-black mb-6">📢 Postează un Anunț</h2>
+                <h2 className="text-2xl font-black mb-6">📢 Postează o Știre / Anunț</h2>
                 <div className="grid sm:grid-cols-2 gap-4 mb-4">
                     <input placeholder="Titlu Postare" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={title} onChange={e=>setTitle(e.target.value)} required />
                     <input placeholder="Autor (ex: Director)" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={authorName} onChange={e=>setAuthorName(e.target.value)} />
                 </div>
                 <textarea placeholder="Conținutul anunțului..." className={`w-full p-4 rounded-2xl outline-none border h-32 resize-none mb-4 ${inputBg}`} value={content} onChange={e=>setContent(e.target.value)} required />
-                
-                <div className="mb-6">
-                    <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Imagine Copertă (URL Extern)</label>
-                    <input placeholder="Ex: https://imgur.com/poza.jpg" value={imageUrl} onChange={e=>setImageUrl(e.target.value)} className={`w-full p-4 rounded-xl border ${inputBg}`} />
-                </div>
-
-                <p className="text-[10px] font-black tracking-widest text-red-500 uppercase mb-3">Afișează Doar Pentru (Lasă gol pt toată școala)</p>
+                <div className="mb-6"><label className="text-[10px] font-black uppercase opacity-50 block mb-2">Imagine Copertă (URL Extern)</label><input placeholder="Ex: https://imgur.com/poza.jpg" value={imageUrl} onChange={e=>setImageUrl(e.target.value)} className={`w-full p-4 rounded-xl border ${inputBg}`} /></div>
+                <p className="text-[10px] font-black tracking-widest text-red-500 uppercase mb-3">Afișează Doar Pentru</p>
                 <div className="flex flex-wrap gap-2 mb-6">{SCHOOL_CLASSES.map(c => <button key={c} type="button" onClick={() => toggleClass(c)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${selectedClasses.includes(c) ? 'bg-red-600 border-red-500 text-white' : `${darkMode?'bg-white/5 border-white/10 text-gray-400':'bg-slate-100 border-slate-200 text-slate-600'}`}`}>{c}</button>)}</div>
-                
-                <button className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-lg hover:bg-red-500 transition">
-                    Publică Anunțul
-                </button>
+                <button className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-lg hover:bg-red-500 transition">Publică Anunțul</button>
             </form>
         )}
 
         {activeTab === "events" && (
             <form onSubmit={handleSaveActivity} className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
                 <h2 className="text-2xl font-black mb-6 text-green-500">📅 Calendar & Evenimente</h2>
-                
                 <div className="mb-6">
-                    <label className="text-[10px] font-black tracking-widest uppercase opacity-50 block mb-2">Tip Înregistrare</label>
+                    <label className="text-[10px] font-black tracking-widest uppercase opacity-50 block mb-2">Tip Eveniment</label>
                     <select value={eventType} onChange={e=>setEventType(e.target.value)} className={`w-full p-4 rounded-2xl outline-none font-bold border cursor-pointer ${inputBg}`}>
                         <option value="activity" className="text-black bg-white">🎟️ Eveniment cu Înscriere / Participare</option>
                         <option value="holiday" className="text-black bg-white">🌴 Vacanță / Zi Liberă (Doar informativ)</option>
                         <option value="exam" className="text-black bg-white">📝 Examen / Testare (Doar informativ)</option>
                     </select>
                 </div>
-
                 <div className="grid sm:grid-cols-2 gap-4 mb-4">
-                    <input placeholder={eventType === 'holiday' ? "Titlu Vacanță (ex: Vacanța de Primăvară)" : (eventType === 'exam' ? "Nume Examen (ex: Simulări Mate)" : "Titlu Eveniment")} className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={title} onChange={e=>setTitle(e.target.value)} required />
-                    {eventType === 'activity' && <input placeholder="Organizator (ex: C.S.E.)" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={authorName} onChange={e=>setAuthorName(e.target.value)} />}
+                    <input placeholder="Titlu Eveniment / Vacanță" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={title} onChange={e=>setTitle(e.target.value)} required />
+                    {eventType === 'activity' && <input placeholder="Organizator" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={authorName} onChange={e=>setAuthorName(e.target.value)} />}
                 </div>
-                
                 <textarea placeholder="Detalii suplimentare..." className={`w-full p-4 rounded-2xl outline-none border h-24 resize-none mb-4 ${inputBg}`} value={content} onChange={e=>setContent(e.target.value)} required />
-                
-                <div className="mb-6">
-                    <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Imagine (URL Extern)</label>
-                    <input placeholder="Ex: https://imgur.com/poza.jpg" value={imageUrl} onChange={e=>setImageUrl(e.target.value)} className={`w-full p-4 rounded-xl border ${inputBg}`} />
-                </div>
+                <div className="mb-6"><label className="text-[10px] font-black uppercase opacity-50 block mb-2">Imagine Copertă (URL Extern)</label><input placeholder="Ex: https://imgur.com/poza.jpg" value={imageUrl} onChange={e=>setImageUrl(e.target.value)} className={`w-full p-4 rounded-xl border ${inputBg}`} /></div>
 
-                <div className="grid sm:grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Din data</label>
-                        <input type="date" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={startDate} onChange={e=>setStartDate(e.target.value)} required />
+                {eventType === 'activity' && (
+                    <div className={`mb-6 p-5 rounded-2xl border ${darkMode ? 'bg-black/30 border-white/5' : 'bg-slate-100 border-slate-200'}`}>
+                        <label className="flex items-center gap-3 cursor-pointer mb-4"><input type="checkbox" checked={isTeamEvent} onChange={e=>setIsTeamEvent(e.target.checked)} className="w-5 h-5 accent-green-500 cursor-pointer rounded" /><span className="font-bold text-sm">👥 Eveniment cu Echipe (Liderul înscrie echipa)</span></label>
+                        {isTeamEvent && (
+                            <div className="grid sm:grid-cols-2 gap-4 animate-popup">
+                                <div><label className="text-[10px] font-black uppercase opacity-50 block mb-2">Mărime Echipă</label><input type="number" min="2" max="10" className={`w-full p-3 rounded-xl outline-none border ${inputBg}`} value={teamSize} onChange={e=>setTeamSize(Number(e.target.value))} required /></div>
+                                <div><label className="text-[10px] font-black uppercase opacity-50 block mb-2">Reguli Formare Echipă</label><select value={teamRule} onChange={e=>setTeamRule(e.target.value)} className={`w-full p-3 rounded-xl outline-none border ${inputBg}`}><option value="any">Fără Reguli (Liber)</option><option value="same_class">Strict: Toți din aceeași clasă</option><option value="same_class_plus_one">Maxim 1 elev din altă clasă</option></select></div>
+                            </div>
+                        )}
                     </div>
+                )}
+
+                <div className="grid sm:grid-cols-2 gap-4 mb-6">
+                    <div><label className="text-[10px] font-black uppercase opacity-50 block mb-2">Din data</label><input type="date" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={startDate} onChange={e=>setStartDate(e.target.value)} required /></div>
                     <div>
-                        <div className="flex justify-between items-end mb-2">
-                            <label className="text-[10px] font-black uppercase opacity-50 block">Până în</label>
-                            <button type="button" onClick={() => setEndDate(startDate)} className="text-[10px] bg-green-500/20 text-green-500 px-3 py-1 rounded-lg font-bold hover:bg-green-500 hover:text-white transition">Același ca Start</button>
-                        </div>
-                        <input type="date" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={endDate} onChange={e=>setEndDate(e.target.value)} required />
+                        <div className="flex justify-between items-end mb-2"><label className="text-[10px] font-black uppercase opacity-50 block">Până în (Opțional)</label><button type="button" onClick={() => setEndDate(startDate)} className="text-[10px] bg-green-500/20 text-green-500 px-3 py-1 rounded-lg font-bold hover:bg-green-500 hover:text-white transition">Același ca Start</button></div>
+                        <input type="date" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={endDate} onChange={e=>setEndDate(e.target.value)} />
                     </div>
                 </div>
 
                 <div className={`mb-4 p-5 rounded-2xl border transition-all ${darkMode ? 'bg-black/30 border-white/5' : 'bg-slate-100 border-slate-200'}`}>
-                    <label className="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" checked={hasTime} onChange={e=>setHasTime(e.target.checked)} className="w-5 h-5 accent-green-500 cursor-pointer rounded" />
-                        <span className="font-bold text-sm">⏰ Adaugă Oră (Opțional)</span>
-                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={hasTime} onChange={e=>setHasTime(e.target.checked)} className="w-5 h-5 accent-green-500 cursor-pointer rounded" /><span className="font-bold text-sm">⏰ Adaugă Oră (Opțional)</span></label>
                     {hasTime && (
                         <div className="grid grid-cols-2 gap-4 mt-4 animate-fade-in">
                             <div><label className="text-[10px] font-black uppercase opacity-50 block mb-2">Ora Începerii</label><input type="time" className={`w-full p-3 rounded-xl outline-none border ${inputBg}`} value={startTime} onChange={e=>setStartTime(e.target.value)} required /></div>
@@ -474,23 +395,20 @@ export default function AdminPanel() {
                 {eventType === 'activity' && (
                     <div className="grid sm:grid-cols-2 gap-4 mb-6 animate-fade-in">
                         <div><label className="text-[10px] font-black uppercase opacity-50 block mb-2">LOCAȚIE</label><input placeholder="Ex: Sala Festivă" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={evLoc} onChange={e=>setEvLoc(e.target.value)} required /></div>
-                        <div><label className="text-[10px] font-black uppercase opacity-50 block mb-2">LOCURI</label><input type="number" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={spots} onChange={e=>setSpots(Number(e.target.value))} required /></div>
+                        <div><label className="text-[10px] font-black uppercase opacity-50 block mb-2">LOCURI (0 = Nelimitat)</label><input type="number" min="0" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={spots} onChange={e=>setSpots(Number(e.target.value))} required /></div>
                     </div>
                 )}
                 
                 <p className="text-[10px] font-black tracking-widest text-green-500 uppercase mb-3">Afișează Doar Pentru</p>
                 <div className="flex flex-wrap gap-2 mb-6">{SCHOOL_CLASSES.map(c => <button key={c} type="button" onClick={() => toggleClass(c)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${selectedClasses.includes(c) ? 'bg-green-600 border-green-500 text-white' : `${darkMode?'bg-white/5 border-white/10 text-gray-400':'bg-slate-100 border-slate-200 text-slate-600'}`}`}>{c}</button>)}</div>
-                
-                <button className="w-full py-4 bg-green-600 text-white rounded-2xl font-black text-lg hover:bg-green-500 transition shadow-lg shadow-green-500/20">
-                    {eventType === 'holiday' ? 'Salvează Vacanța' : (eventType === 'exam' ? 'Salvează Examenul' : 'Creează Eveniment')}
-                </button>
+
+                <button className="w-full py-4 bg-green-600 text-white rounded-2xl font-black text-lg hover:bg-green-500 transition shadow-lg shadow-green-500/20">Salvează în Calendar</button>
             </form>
         )}
 
         {activeTab === "notif" && (
-          <div className="grid lg:grid-cols-2 gap-8">
-            <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
-              <h2 className="text-2xl font-black mb-8">📢 Notificare Push</h2>
+            <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl max-w-2xl ${cardBg}`}>
+              <h2 className="text-2xl font-black mb-8">📢 Trimite Notificare Push</h2>
               <div className="space-y-4">
                 <select value={selectedClassNotif} onChange={(e)=>setSelectedClassNotif(e.target.value)} className={`w-full p-4 rounded-2xl font-black outline-none border ${inputBg}`}>
                   <option value="Toată Școala" className="bg-white text-black">Către: Toată Școala</option>
@@ -501,25 +419,13 @@ export default function AdminPanel() {
                 <button onClick={handleSendNotif} className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-lg hover:bg-red-500 transition">Trimite</button>
               </div>
             </div>
-            <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
-                <h2 className="text-2xl font-black mb-8 text-blue-500">🔔 Anunță Participanții</h2>
-                <div className="grid gap-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
-                    {posts.filter(p=>p.col === 'calendar_events' && p.type === 'activity').map(p => (
-                        <div key={p.id} className={`p-5 rounded-2xl border flex flex-col justify-between items-start gap-4 ${darkMode ? 'bg-black/40 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
-                            <div><h3 className="font-black text-base">{p.title}</h3><p className="text-xs opacity-60 mt-1 font-bold">Înscriși: {p.attendees?.length || 0}</p></div>
-                            <button onClick={() => handleNotifyAttendees(p)} disabled={!p.attendees || p.attendees.length === 0} className="w-full bg-blue-600 text-white px-4 py-3 rounded-xl font-black text-xs hover:bg-blue-500 transition disabled:opacity-30 disabled:cursor-not-allowed">Trimite Mesaj</button>
-                        </div>
-                    ))}
-                </div>
-            </div>
-          </div>
         )}
 
         {activeTab === "whitelist" && (
             <div className="grid lg:grid-cols-2 gap-8">
                 <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
                     <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-black">Adaugă Elevi</h2>
+                        <h2 className="text-xl font-black">Adaugă Emailuri</h2>
                         <label className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-[10px] sm:text-xs font-bold cursor-pointer transition shadow-lg flex items-center gap-2">📁 .txt / .csv <input type="file" accept=".txt,.csv" onChange={handleFileUpload} className="hidden" /></label>
                     </div>
                     <textarea value={emailList} onChange={e => setEmailList(e.target.value)} className={`w-full p-4 rounded-2xl outline-none border h-48 resize-none font-mono text-sm leading-relaxed ${inputBg}`} placeholder="popescu.ion&#10;ionescu.maria"/>
@@ -539,6 +445,76 @@ export default function AdminPanel() {
                 </div>
             </div>
         )}
+
+        {/* MODAL ISTORIC ELEV */}
+        {viewUserHistory && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-popup">
+                <div className={`border p-8 rounded-[2.5rem] w-full max-w-lg shadow-2xl relative ${darkMode ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200 text-slate-900'}`}>
+                    <button onClick={() => setViewUserHistory(null)} className="absolute top-6 right-6 w-8 h-8 bg-white/10 rounded-full font-bold">✕</button>
+                    <h2 className="text-2xl font-black mb-1">Istoric Activitate</h2>
+                    <p className="text-xs text-blue-500 font-bold uppercase tracking-wider mb-2">{viewUserHistory.name}</p>
+                    <p className="text-[10px] opacity-50 font-mono mb-6">Înregistrat pe site: {viewUserHistory.termsAcceptedAt ? new Date(viewUserHistory.termsAcceptedAt).toLocaleDateString('ro-RO') : 'Necunoscut'}</p>
+                    
+                    <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+                        {viewUserHistory.history.length === 0 ? <p className="text-sm italic opacity-60">Fără participări la evenimente.</p> : viewUserHistory.history.map((h:any, i:number) => (
+                            <div key={i} className={`p-4 rounded-xl border ${darkMode ? 'bg-black/40 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
+                                <div className="font-bold text-sm mb-1">{h.eventTitle}</div>
+                                <div className="flex justify-between items-center text-[10px] font-mono opacity-60">
+                                    <span>Rol: <strong className="text-red-400">{h.role}</strong></span>
+                                    <span>Data Înscrierii: {h.date}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* MODAL LISTA PARTICIPANTI */}
+        {viewAttendeesModal && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-popup">
+                <div className={`border p-8 rounded-[2.5rem] w-full max-w-2xl shadow-2xl relative ${darkMode ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200 text-slate-900'}`}>
+                    <button onClick={() => setViewAttendeesModal(null)} className="absolute top-6 right-6 w-8 h-8 bg-white/10 rounded-full font-bold">✕</button>
+                    <h2 className="text-2xl font-black mb-1">{viewAttendeesModal.isTeamEvent ? "Echipe Înscrise" : "Lista Participanți"}</h2>
+                    <p className="text-xs text-green-500 font-bold uppercase tracking-wider mb-6">{viewAttendeesModal.title}</p>
+                    
+                    <div className="max-h-[50vh] overflow-y-auto mb-6 pr-2 space-y-4 custom-scrollbar">
+                        {viewAttendeesModal.isTeamEvent ? (
+                            viewAttendeesModal.teams?.length === 0 ? <p className="text-sm italic opacity-60">Nicio echipă înscrisă.</p> :
+                            viewAttendeesModal.teams?.map((t:any, idx:number) => (
+                                <div key={idx} className={`p-4 rounded-2xl border ${darkMode ? 'bg-black/40 border-white/10' : 'bg-slate-50 border-slate-300'}`}>
+                                    <div className="flex justify-between items-center mb-3 pb-2 border-b border-white/10">
+                                        <div className="font-black text-sm text-red-500">Echipa #{idx + 1}</div>
+                                        <div className="text-[10px] opacity-50 font-mono">Înscris: {new Date(t.registeredAt).toLocaleString('ro-RO')}</div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-xs font-bold bg-white/5 p-2 rounded-lg">
+                                            <span>👑 {t.leaderName} (Lider) <span className="opacity-50 text-[10px] ml-2">{t.leaderClass}</span></span>
+                                            <span className="opacity-60 font-mono">{t.leaderPhone}</span>
+                                        </div>
+                                        {t.members?.map((m:any, i:number) => (
+                                            <div key={i} className="flex justify-between text-xs p-2">
+                                                <span>👤 {m.name} <span className="opacity-50 text-[10px] ml-2">{m.class}</span></span>
+                                                <span className="opacity-60 font-mono">{m.phone}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            viewAttendeesModal.attendees?.length === 0 ? <p className="text-sm italic opacity-60">Niciun elev înscris.</p> :
+                            viewAttendeesModal.attendees?.map((a:any, idx:number) => (
+                                <div key={idx} className={`flex justify-between items-center p-3 rounded-xl border ${darkMode ? 'bg-black/40 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
+                                    <div className="font-bold text-sm">{idx + 1}. {a.name} <span className="opacity-50 text-[10px] ml-2">{a.class}</span></div>
+                                    <div className="text-[10px] font-mono opacity-60">{a.phone}</div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            </div>
+        )}
+
       </div>
     </div>
   );
