@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "GhibaPlus",
     description: "Platforma elevilor de la Colegiul Național 'Elena Ghiba Birta'",
-    url: "https://www.ghibaplus.vercel.app", // Schimbă cu domeniul tău real
+    url: "https://ghibaplus.vercel.app", // Schimbă cu domeniul tău real
     siteName: "GhibaPlus",
     images: [{ url: "/favicon.ico" }], // Pune un logo al liceului in folderul public/
     locale: "ro_RO",

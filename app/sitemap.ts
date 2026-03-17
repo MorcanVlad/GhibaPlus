@@ -2,7 +2,7 @@ import { MetadataRoute } from 'next'
 
 export default function sitemap(): MetadataRoute.Sitemap {
   // Aici pui domeniul tău real
-  const baseUrl = 'https://www.ghibaplus.vercel.app' 
+  const baseUrl = 'https://ghibaplus.vercel.app' 
 
   return [
     {
