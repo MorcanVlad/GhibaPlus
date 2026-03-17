@@ -283,9 +283,15 @@ export default function Dashboard() {
       setManageTeamModal(null); 
   };
 
+  // VERIFICARE: Jucatorul nu poate intra in mai multe echipe
   const addTeamMemberExisting = async (selectedUser: any, team: any) => {
       if(team.members.length >= (manageTeamModal.teamSize - 1)) return alert(`Echipa este deja plină!`);
-      if(team.members.find((m:any) => m.id === selectedUser.id)) return alert("Elevul este deja in echipă!");
+      if(team.members.find((m:any) => m.id === selectedUser.id)) return alert("Elevul este deja in această echipă!");
+      
+      // VERIFICĂ DACA E DEJA IN ALTA ECHIPA LA ACEST EVENIMENT
+      const isAlreadyInAnotherTeam = manageTeamModal.teams?.some((t:any) => t.leaderId === selectedUser.id || t.members?.some((m:any) => m.id === selectedUser.id));
+      if (isAlreadyInAnotherTeam) return alert("Acest elev este DEJA înscris în altă echipă pentru acest eveniment!");
+
       if(manageTeamModal.teamRule === "same_class" && selectedUser.class !== user.class) return alert("Regulă strictă: Membrii trebuie să fie din aceeași clasă!");
       if(manageTeamModal.teamRule === "same_class_plus_one") {
           const outsiders = team.members.filter((m:any) => m.class !== user.class).length;
@@ -299,9 +305,15 @@ export default function Dashboard() {
       setTeamSearch("");
   };
 
+  // VERIFICARE: Jucatorul nu poate intra in mai multe echipe
   const addTeamMember = (selectedUser: any) => {
       if(teamMembers.length >= (teamModalEvent.teamSize - 1)) return alert(`Echipa poate avea maxim ${teamModalEvent.teamSize} membri!`);
-      if(teamMembers.find(m => m.id === selectedUser.id)) return alert("Elevul este deja in echipă!");
+      if(teamMembers.find(m => m.id === selectedUser.id)) return alert("Elevul este deja adăugat in lista curentă!");
+
+      // VERIFICĂ DACA E DEJA IN ALTA ECHIPA LA ACEST EVENIMENT
+      const isAlreadyInAnotherTeam = teamModalEvent.teams?.some((t:any) => t.leaderId === selectedUser.id || t.members?.some((m:any) => m.id === selectedUser.id));
+      if (isAlreadyInAnotherTeam) return alert("Acest elev este DEJA înscris în altă echipă pentru acest eveniment!");
+
       if(teamModalEvent.teamRule === "same_class" && selectedUser.class !== user.class) return alert("Regulă strictă: Toți membrii trebuie să fie din aceeași clasă cu tine!");
       if(teamModalEvent.teamRule === "same_class_plus_one") {
           const outsiders = teamMembers.filter(m => m.class !== user.class).length;
@@ -386,7 +398,6 @@ export default function Dashboard() {
                 <button onClick={openNotifications} className="relative w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-transform hover:scale-110 text-sm sm:text-base">🔔 {notifications.some(n=>!n.read) && <span className="absolute top-1 right-1 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-red-600 rounded-full border-2 border-white dark:border-slate-800 animate-pulse"></span>}</button>
                 <button onClick={() => setShowSettings(true)} className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-transform duration-300 hover:rotate-90 origin-center text-sm sm:text-base">⚙️</button>
 
-                {/* MODIFICAT PENTRU A NU MAI ASCUNDE BUTONUL DE LOGOUT */}
                 <div className="flex items-center gap-1 sm:gap-2 pl-1 sm:pl-2 border-l border-black/10 dark:border-white/10 ml-0.5 sm:ml-1">
                     {(user.role === 'admin' || user.role === 'profesor') && (
                         <button onClick={() => router.push('/admin')} className={`bg-gradient-to-r ${user.role === 'profesor' ? 'from-blue-600 to-indigo-500 shadow-blue-500/20' : 'from-red-600 to-rose-500 shadow-red-500/20'} text-white px-2 py-1 sm:px-4 sm:py-1.5 rounded-full text-[9px] sm:text-[11px] font-black shadow-lg hover:-translate-y-0.5 transition-all`}>
@@ -404,7 +415,6 @@ export default function Dashboard() {
       <main className="max-w-6xl mx-auto p-4 pt-24 sm:pt-28 grid lg:grid-cols-3 gap-6 sm:gap-8 relative z-10">
         <div className="lg:col-span-2">
             
-          {/* NOU: BROWSER BUN VENIT (FEED HEADER) */}
           <div className={`p-6 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] border backdrop-blur-xl mb-6 shadow-sm ${cardBg}`}>
               <h2 className="text-2xl sm:text-3xl font-black mb-1 leading-tight">
                   {t.welcomeTitle} <span className="text-red-500">{user.name?.split(' ')[0]}</span> 👋
@@ -526,8 +536,6 @@ export default function Dashboard() {
                     <button onClick={() => setShowContactAdmin(true)} className={`w-full py-3 sm:py-3.5 rounded-xl font-bold text-xs hover:-translate-y-0.5 transition-all shadow-md border ${darkMode ? 'bg-slate-800 text-white hover:bg-slate-700 border-white/10' : 'bg-slate-200 text-slate-800 hover:bg-slate-300 border-slate-300'}`}>
                         📧 {t.contactAdmin}
                     </button>
-
-                    {/* NOU: Buton de Deconectare in interiorul Setarilor */}
                     <button onClick={handleSecureLogout} className={`w-full py-3 sm:py-3.5 rounded-xl font-bold text-xs transition-all shadow-md border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white`}>
                         🚪 {t.logout}
                     </button>
