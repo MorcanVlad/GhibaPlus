@@ -6,11 +6,11 @@ import { useRouter } from "next/navigation";
 import { doc, getDoc, updateDoc, collection, arrayUnion, arrayRemove, orderBy, onSnapshot, addDoc, query, deleteDoc } from "firebase/firestore";
 
 const TRANSLATIONS: any = {
-  ro: { search: "Caută noutăți...", settings: "Setări", admin: "ADMIN", welcomeTitle: "Bine ai venit,", welcomeMsg: "Ne bucurăm să te avem pe GhibaPlus.", notif: "Notificări", noNotif: "Nicio notificare momentan.", dateTime: "DATA / ORA", location: "LOCAȚIE", join: "Particip ✅", cancel: "Retrage-te", teamJoin: "Înscrie Echipă 👥", teamManage: "Gestionează Echipa", lang: "Limba Interfeței", class: "Clasa Ta", phone: "Număr de Telefon", save: "Salvează Setările", council: "Consiliul Elevilor", noSpots: "Locuri epuizate!", translating: "Se traduce...", resetPass: "🔑 Trimite link resetare parolă", resetSent: "Email-ul a fost trimis!", allSchool: "Toată Școala", myClass: "Clasa Mea", logout: "Deconectare", spots: "Locuri", unlimited: "Nelimitat", calendarTitle: "📅 Calendar", contactAdmin: "Contactează Administratorul", ruleAny: "Liber (Fără restricții)", ruleSameClass: "Strict: Doar din clasa ta", rulePlusOne: "Maxim 1 elev din altă clasă" },
-  en: { search: "Search news...", settings: "Settings", admin: "ADMIN", welcomeTitle: "Welcome,", welcomeMsg: "Glad to have you on GhibaPlus.", notif: "Notifications", noNotif: "No notifications.", dateTime: "DATE / TIME", location: "LOCATION", join: "Join ✅", cancel: "Leave", teamJoin: "Register Team 👥", teamManage: "Manage Team", lang: "Interface Language", class: "Your Class", phone: "Phone Number", save: "Save Settings", council: "Student Council", noSpots: "No spots left!", translating: "Translating...", resetPass: "🔑 Send password reset link", resetSent: "Email sent!", allSchool: "Whole School", myClass: "My Class", logout: "Logout", spots: "Spots", unlimited: "Unlimited", calendarTitle: "📅 Calendar", contactAdmin: "Contact Administrator", ruleAny: "No restrictions", ruleSameClass: "Strict: Same class only", rulePlusOne: "Max 1 from another class" },
-  fr: { search: "Recherche...", settings: "Paramètres", admin: "ADMIN", welcomeTitle: "Bienvenue,", welcomeMsg: "Heureux de vous avoir sur GhibaPlus !", notif: "Notifications", noNotif: "Pas de notifications.", dateTime: "DATE / HEURE", location: "LIEU", join: "Participer ✅", cancel: "Annuler", teamJoin: "Inscrire l'équipe 👥", teamManage: "Gérer l'équipe", lang: "Langue", class: "Classe", phone: "Téléphone", save: "Enregistrer", council: "Conseil", noSpots: "Complet!", translating: "Traduction...", resetPass: "🔑 Réinitialiser le mot de passe", resetSent: "Email envoyé !", allSchool: "Toute l'école", myClass: "Ma Classe", logout: "Déconnexion", spots: "Places", unlimited: "Illimité", calendarTitle: "📅 Calendrier", contactAdmin: "Contacter l'administrateur", ruleAny: "Aucune restriction", ruleSameClass: "Strict: Même classe", rulePlusOne: "Max 1 d'une autre classe" },
-  de: { search: "Suche...", settings: "Einstellungen", admin: "ADMIN", welcomeTitle: "Willkommen,", welcomeMsg: "Schön, dass du bei GhibaPlus bist!", notif: "Benachrichtigungen", noNotif: "Keine Nachrichten.", dateTime: "DATUM / ZEIT", location: "ORT", join: "Teilnehmen ✅", cancel: "Verlassen", teamJoin: "Team anmelden 👥", teamManage: "Team verwalten", lang: "Sprache", class: "Klasse", phone: "Telefon", save: "Speichern", council: "Schülerrat", noSpots: "Voll!", translating: "Übersetzen...", resetPass: "🔑 Passwort zurücksetzen", resetSent: "E-Mail gesendet!", allSchool: "Ganze Schule", myClass: "Meine Klasse", logout: "Abmelden", spots: "Plätze", unlimited: "Unbegrenzt", calendarTitle: "📅 Kalender", contactAdmin: "Administrator kontaktieren", ruleAny: "Keine Einschränkungen", ruleSameClass: "Streng: Gleiche Klasse", rulePlusOne: "Max 1 aus anderer Klasse" },
-  es: { search: "Buscar...", settings: "Ajustes", admin: "ADMIN", welcomeTitle: "¡Bienvenido,", welcomeMsg: "Nos alegra tenerte en GhibaPlus.", notif: "Notificaciones", noNotif: "Sin notificaciones.", dateTime: "FECHA / HORA", location: "UBICACIÓN", join: "Participar ✅", cancel: "Salir", teamJoin: "Registrar Equipo 👥", teamManage: "Gestionar Equipo", lang: "Idioma", class: "Clase", phone: "Teléfono", save: "Guardar", council: "Consejo", noSpots: "¡Lleno!", translating: "Traduciendo...", resetPass: "🔑 Restablecer contraseña", resetSent: "¡Correo enviado!", allSchool: "Toda la Escuela", myClass: "Mi Clase", logout: "Cerrar sesión", spots: "Lugares", unlimited: "Ilimitado", calendarTitle: "📅 Calendario", contactAdmin: "Contactar Administrador", ruleAny: "Sin restricciones", ruleSameClass: "Estricto: Misma clase", rulePlusOne: "Máx 1 de otra clase" }
+  ro: { search: "Caută noutăți...", settings: "Setări", admin: "ADMIN", welcomeTitle: "Bine ai venit,", welcomeMsg: "Ne bucurăm să te avem pe GhibaPlus.", notif: "Notificări", noNotif: "Nicio notificare momentan.", dateTime: "DATA / ORA", location: "LOCAȚIE", join: "Particip ✅", cancel: "Retrage-te", teamJoin: "Înscrie Echipă 👥", teamManage: "Gestionează Echipa", lang: "Limba Interfeței", class: "Clasa Ta", phone: "Număr de Telefon", save: "Salvează Setările", council: "Consiliul Elevilor", noSpots: "Locuri epuizate!", translating: "Se traduce...", resetPass: "🔑 Trimite link resetare parolă", resetSent: "Email-ul a fost trimis!", allSchool: "Toată Școala", myClass: "Clasa Mea", logout: "Deconectare", spots: "Locuri", unlimited: "Nelimitat", calendarTitle: "📅 Calendarul Meu", contactAdmin: "Contactează Administratorul", ruleAny: "Liber (Fără restricții)", ruleSameClass: "Strict: Doar din clasa ta", rulePlusOne: "Maxim 1 elev din altă clasă" },
+  en: { search: "Search news...", settings: "Settings", admin: "ADMIN", welcomeTitle: "Welcome,", welcomeMsg: "Glad to have you on GhibaPlus.", notif: "Notifications", noNotif: "No notifications.", dateTime: "DATE / TIME", location: "LOCATION", join: "Join ✅", cancel: "Leave", teamJoin: "Register Team 👥", teamManage: "Manage Team", lang: "Interface Language", class: "Your Class", phone: "Phone Number", save: "Save Settings", council: "Student Council", noSpots: "No spots left!", translating: "Translating...", resetPass: "🔑 Send password reset link", resetSent: "Email sent!", allSchool: "Whole School", myClass: "My Class", logout: "Logout", spots: "Spots", unlimited: "Unlimited", calendarTitle: "📅 My Calendar", contactAdmin: "Contact Administrator", ruleAny: "No restrictions", ruleSameClass: "Strict: Same class only", rulePlusOne: "Max 1 from another class" },
+  fr: { search: "Recherche...", settings: "Paramètres", admin: "ADMIN", welcomeTitle: "Bienvenue,", welcomeMsg: "Heureux de vous avoir sur GhibaPlus !", notif: "Notifications", noNotif: "Pas de notifications.", dateTime: "DATE / HEURE", location: "LIEU", join: "Participer ✅", cancel: "Annuler", teamJoin: "Inscrire l'équipe 👥", teamManage: "Gérer l'équipe", lang: "Langue", class: "Classe", phone: "Téléphone", save: "Enregistrer", council: "Conseil", noSpots: "Complet!", translating: "Traduction...", resetPass: "🔑 Réinitialiser le mot de passe", resetSent: "Email envoyé !", allSchool: "Toute l'école", myClass: "Ma Classe", logout: "Déconnexion", spots: "Places", unlimited: "Illimité", calendarTitle: "📅 Mon Calendrier", contactAdmin: "Contacter l'administrateur", ruleAny: "Aucune restriction", ruleSameClass: "Strict: Même classe", rulePlusOne: "Max 1 d'une autre classe" },
+  de: { search: "Suche...", settings: "Einstellungen", admin: "ADMIN", welcomeTitle: "Willkommen,", welcomeMsg: "Schön, dass du bei GhibaPlus bist!", notif: "Benachrichtigungen", noNotif: "Keine Nachrichten.", dateTime: "DATUM / ZEIT", location: "ORT", join: "Teilnehmen ✅", cancel: "Verlassen", teamJoin: "Team anmelden 👥", teamManage: "Team verwalten", lang: "Sprache", class: "Klasse", phone: "Telefon", save: "Speichern", council: "Schülerrat", noSpots: "Voll!", translating: "Übersetzen...", resetPass: "🔑 Passwort zurücksetzen", resetSent: "E-Mail gesendet!", allSchool: "Ganze Schule", myClass: "Meine Klasse", logout: "Abmelden", spots: "Plätze", unlimited: "Unbegrenzt", calendarTitle: "📅 Mein Kalender", contactAdmin: "Administrator kontaktieren", ruleAny: "Keine Einschränkungen", ruleSameClass: "Streng: Gleiche Klasse", rulePlusOne: "Max 1 aus anderer Klasse" },
+  es: { search: "Buscar...", settings: "Ajustes", admin: "ADMIN", welcomeTitle: "¡Bienvenido,", welcomeMsg: "Nos alegra tenerte en GhibaPlus.", notif: "Notificaciones", noNotif: "Sin notificaciones.", dateTime: "FECHA / HORA", location: "UBICACIÓN", join: "Participar ✅", cancel: "Salir", teamJoin: "Registrar Equipo 👥", teamManage: "Gestionar Equipo", lang: "Idioma", class: "Clase", phone: "Teléfono", save: "Guardar", council: "Consejo", noSpots: "¡Lleno!", translating: "Traduciendo...", resetPass: "🔑 Restablecer contraseña", resetSent: "¡Correo enviado!", allSchool: "Toda la Escuela", myClass: "Mi Clase", logout: "Cerrar sesión", spots: "Lugares", unlimited: "Ilimitado", calendarTitle: "📅 Mi Calendario", contactAdmin: "Contactar Administrador", ruleAny: "Sin restricciones", ruleSameClass: "Estricto: Misma clase", rulePlusOne: "Máx 1 de otra clase" }
 };
 
 export default function Dashboard() {
@@ -51,11 +51,18 @@ export default function Dashboard() {
   const [showClassChangePopup, setShowClassChangePopup] = useState(false);
   const [showGraduatePopup, setShowGraduatePopup] = useState(false);
   const [newClassName, setNewClassName] = useState("");
+
+  const [now, setNow] = useState(new Date());
   
   const unsubRefs = useRef<{ notif?: any, news?: any, events?: any, users?: any }>({});
   
   const translationCache = useRef(new Map());
   const router = useRouter();
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (localStorage.getItem("ghiba_theme") === "light") setDarkMode(false);
@@ -124,7 +131,18 @@ export default function Dashboard() {
       calItems = calItems.filter((item:any) => {
           const validDate = new Date(item.endDate || item.date) >= today;
           const validClass = !item.targetClasses || item.targetClasses.includes("Toată Școala") || item.targetClasses.includes(user.class);
-          return validDate && validClass;
+          
+          // NOU: Filtrare pentru a afișa doar evenimentele la care ești înscris
+          let isEnrolled = true;
+          if (item.type === 'activity') {
+              if (item.isTeamEvent) {
+                  isEnrolled = item.teams?.some((t:any) => t.leaderId === user.id || t.members?.some((m:any) => m.id === user.id)) || false;
+              } else {
+                  isEnrolled = item.attendees?.some((a:any) => a.id === user.id) || false;
+              }
+          }
+
+          return validDate && validClass && isEnrolled;
       });
       calItems.sort((a:any, b:any) => new Date(a.date||0).getTime() - new Date(b.date||0).getTime());
       setCalendarEvents(calItems);
@@ -188,11 +206,6 @@ export default function Dashboard() {
     };
     translateWholePage();
   }, [feed, calendarEvents, notifications, currentLang, user]);
-
-  const handleResetPasswordInApp = async () => {
-    if (!confirm("Vrei să îți resetezi parola? Vei primi un email.")) return;
-    try { await sendPasswordResetEmail(auth, user.email); alert(t.resetSent); } catch (error: any) { alert("Eroare: " + error.message); }
-  };
 
   const handleSaveSettings = async () => {
       if (editPhone.length !== 10) return alert("Numărul de telefon trebuie să aibă 10 cifre!");
@@ -283,12 +296,10 @@ export default function Dashboard() {
       setManageTeamModal(null); 
   };
 
-  // VERIFICARE: Jucatorul nu poate intra in mai multe echipe
   const addTeamMemberExisting = async (selectedUser: any, team: any) => {
       if(team.members.length >= (manageTeamModal.teamSize - 1)) return alert(`Echipa este deja plină!`);
       if(team.members.find((m:any) => m.id === selectedUser.id)) return alert("Elevul este deja in această echipă!");
       
-      // VERIFICĂ DACA E DEJA IN ALTA ECHIPA LA ACEST EVENIMENT
       const isAlreadyInAnotherTeam = manageTeamModal.teams?.some((t:any) => t.leaderId === selectedUser.id || t.members?.some((m:any) => m.id === selectedUser.id));
       if (isAlreadyInAnotherTeam) return alert("Acest elev este DEJA înscris în altă echipă pentru acest eveniment!");
 
@@ -305,12 +316,10 @@ export default function Dashboard() {
       setTeamSearch("");
   };
 
-  // VERIFICARE: Jucatorul nu poate intra in mai multe echipe
   const addTeamMember = (selectedUser: any) => {
       if(teamMembers.length >= (teamModalEvent.teamSize - 1)) return alert(`Echipa poate avea maxim ${teamModalEvent.teamSize} membri!`);
       if(teamMembers.find(m => m.id === selectedUser.id)) return alert("Elevul este deja adăugat in lista curentă!");
 
-      // VERIFICĂ DACA E DEJA IN ALTA ECHIPA LA ACEST EVENIMENT
       const isAlreadyInAnotherTeam = teamModalEvent.teams?.some((t:any) => t.leaderId === selectedUser.id || t.members?.some((m:any) => m.id === selectedUser.id));
       if (isAlreadyInAnotherTeam) return alert("Acest elev este DEJA înscris în altă echipă pentru acest eveniment!");
 
@@ -352,6 +361,18 @@ export default function Dashboard() {
       if(rule === "same_class") return t.ruleSameClass;
       if(rule === "same_class_plus_one") return t.rulePlusOne;
       return t.ruleAny;
+  };
+
+  const renderTimer = (deadline: string) => {
+      if (!deadline) return null;
+      const diff = new Date(deadline).getTime() - now.getTime();
+      if (diff <= 0) return null; 
+      
+      const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const m = Math.floor((diff / 1000 / 60) % 60);
+      const s = Math.floor((diff / 1000) % 60);
+      return `${d}Z : ${h}H : ${m}M : ${s}S`;
   };
 
   if (!user) return null;
@@ -428,7 +449,11 @@ export default function Dashboard() {
           </div>
 
           <div className="space-y-6">
-              {filteredFeed.map(item => (
+              {filteredFeed.map(item => {
+                const isRegistrationExpired = item.registrationDeadline && new Date(item.registrationDeadline).getTime() <= now.getTime();
+                const timerString = renderTimer(item.registrationDeadline);
+
+                return (
                 <div key={item.id} onClick={() => setSelectedPost(item)} className={`rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden border backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 sm:hover:-translate-y-1.5 hover:shadow-2xl cursor-pointer ${cardBg}`}>
                   <div className="p-6 sm:p-8">
                     <div className="flex gap-4 sm:gap-5 items-start mb-5 sm:mb-6">
@@ -449,6 +474,28 @@ export default function Dashboard() {
                     
                     <p className="line-clamp-3 opacity-80 mb-5 sm:mb-6 text-sm sm:text-base leading-relaxed">{item.translatedContent || item.content}</p>
                     
+                    {item.linkedPostId && (() => {
+                        const linkedPost = [...feed, ...calendarEvents].find(x => x.id === item.linkedPostId);
+                        if(!linkedPost) return null;
+                        return (
+                            <div className={`mb-6 p-4 rounded-xl border border-blue-500/30 border-l-4 border-l-blue-500 transition-colors ${darkMode ? 'bg-blue-500/5 hover:bg-blue-500/10' : 'bg-blue-50 hover:bg-blue-100'}`} onClick={(e) => { e.stopPropagation(); setSelectedPost(linkedPost); }}>
+                                <div className="text-[10px] font-black uppercase text-blue-500 mb-1 flex items-center gap-1">🔗 Etichetat: {linkedPost.type === 'activity' ? 'Eveniment' : 'Știre'}</div>
+                                <div className="font-bold text-sm sm:text-base mb-1">{linkedPost.translatedTitle || linkedPost.title}</div>
+                                <div className="text-xs opacity-70 line-clamp-1">{linkedPost.translatedContent || linkedPost.content}</div>
+                            </div>
+                        );
+                    })()}
+
+                    {item.type === 'activity' && timerString && !isRegistrationExpired && (
+                        <div className="mb-6 flex items-center gap-3 p-3 sm:p-4 rounded-xl border bg-orange-500/10 border-orange-500/20 text-orange-500 shadow-inner">
+                            <span className="text-lg">⏳</span>
+                            <div>
+                                <div className="text-[10px] font-black uppercase tracking-wider opacity-80">Timp Rămas Înscrieri</div>
+                                <div className="font-mono font-black text-sm sm:text-base">{timerString}</div>
+                            </div>
+                        </div>
+                    )}
+
                     {item.type === 'activity' && (
                         <div className={`mb-5 sm:mb-6 p-4 sm:p-5 rounded-xl sm:rounded-2xl border grid gap-3 sm:gap-4 grid-cols-2 ${darkMode ? 'bg-black/30 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
                             <div><span className="text-[9px] sm:text-[10px] font-black tracking-widest uppercase opacity-50 block mb-0.5 sm:mb-1">{t.dateTime}</span><span className="font-bold text-blue-500 text-xs sm:text-sm">{formatEventDateTime(item)}</span></div>
@@ -470,7 +517,7 @@ export default function Dashboard() {
                           </button>
                       </div>
                       
-                      {item.type === 'activity' && user?.class !== 'Absolvent' && (
+                      {item.type === 'activity' && user?.class !== 'Absolvent' && !isRegistrationExpired && (
                         <button onClick={(e) => handleRegisterClick(e, item)} className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all shadow-md ${
                             (item.isTeamEvent ? item.teams?.some((t:any)=>t.leaderId===user.id || t.members?.some((m:any)=>m.id===user.id)) : item.attendees?.some((a:any)=>a.id===user.id)) 
                             ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white' 
@@ -478,20 +525,28 @@ export default function Dashboard() {
                           {item.isTeamEvent ? (item.teams?.some((t:any)=>t.leaderId===user.id || t.members?.some((m:any)=>m.id===user.id)) ? t.teamManage : t.teamJoin) : (item.attendees?.some((a:any)=>a.id===user.id) ? t.cancel : t.join)}
                         </button>
                       )}
+                      
+                      {item.type === 'activity' && user?.class !== 'Absolvent' && isRegistrationExpired && (
+                          <div className="text-right">
+                              <span className="text-[10px] sm:text-xs font-bold text-red-500 bg-red-500/10 px-3 py-1.5 rounded-lg border border-red-500/20 block mb-1">Înscrieri Închise</span>
+                              <button onClick={(e) => {e.stopPropagation(); alert(`📞 Pentru modificări, contactează organizatorul:\n${item.organizerPhone || "Nu a fost specificat"}`)}} className="text-[9px] sm:text-[10px] font-bold opacity-60 hover:opacity-100 hover:text-red-500 transition-colors underline">Contactează organizator</button>
+                          </div>
+                      )}
+
                       {item.type === 'activity' && user?.class === 'Absolvent' && (
                          <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-3 py-1.5 rounded-lg border border-red-500/20">Fără acces la înscrieri</span>
                       )}
                     </div>
                   </div>
                 </div>
-              ))}
+              )})}
           </div>
         </div>
 
         <div className={`p-6 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] lg:sticky lg:top-28 border backdrop-blur-xl h-fit ${cardBg}`}>
             <h3 className="font-black text-lg sm:text-xl mb-5 sm:mb-6">{t.calendarTitle}</h3>
             <div className="space-y-3">
-                {translatedCalendar.length === 0 && <p className="opacity-50 text-xs sm:text-sm italic py-4">Nu există evenimente viitoare.</p>}
+                {translatedCalendar.length === 0 && <p className="opacity-50 text-xs sm:text-sm italic py-4">Nu ești înscris la niciun eveniment viitor.</p>}
                 {translatedCalendar.map(ev => (
                     <div key={ev.id} onClick={() => setSelectedPost(ev)} className={`cursor-pointer p-3 sm:p-4 rounded-xl sm:rounded-2xl border transition-all relative overflow-hidden transform hover:-translate-y-1 hover:shadow-md ${darkMode ? 'bg-white/5 border-white/5 hover:bg-white/10' : 'bg-slate-50 border-slate-200 hover:bg-white'}`}>
                         <div className={`absolute left-0 top-0 bottom-0 w-1 sm:w-1.5 ${ev.type === 'holiday' ? 'bg-yellow-500' : (ev.type === 'exam' ? 'bg-purple-500' : 'bg-blue-500')}`}></div>
@@ -752,7 +807,11 @@ export default function Dashboard() {
       })()}
 
       {/* FULL POST MODAL */}
-      {selectedPost && !teamModalEvent && !manageTeamModal && (
+      {selectedPost && !teamModalEvent && !manageTeamModal && (() => {
+          const isRegExpired = selectedPost.registrationDeadline && new Date(selectedPost.registrationDeadline).getTime() <= now.getTime();
+          const pTimer = renderTimer(selectedPost.registrationDeadline);
+
+          return (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto custom-scrollbar animate-popup" onClick={() => setSelectedPost(null)}>
             <div className={`w-full max-w-2xl rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden border my-auto relative ${cardBg}`} onClick={e => e.stopPropagation()}>
               <button onClick={() => setSelectedPost(null)} className="absolute top-3 right-3 sm:top-4 sm:right-4 z-10 w-10 h-10 sm:w-12 sm:h-12 bg-black/50 text-white rounded-full font-black backdrop-blur-md border border-white/20 hover:bg-black/70 hover:rotate-90 transition-all">✕</button>
@@ -761,7 +820,26 @@ export default function Dashboard() {
                 <h2 className="text-xl sm:text-3xl font-black mb-4 sm:mb-6 leading-tight">{selectedPost.translatedTitle || selectedPost.title}</h2>
                 <p className="text-sm sm:text-lg leading-relaxed opacity-90 whitespace-pre-wrap mb-6 sm:mb-8">{selectedPost.translatedContent || selectedPost.content}</p>
                 
-                {selectedPost.type === 'activity' && user?.class !== 'Absolvent' && (
+                {/* ETICHETĂ ȘI ÎN MODAL */}
+                {selectedPost.linkedPostId && (() => {
+                    const linkedPost = [...feed, ...calendarEvents].find(x => x.id === selectedPost.linkedPostId);
+                    if(!linkedPost) return null;
+                    return (
+                        <div className={`mb-6 p-4 rounded-xl border border-blue-500/30 border-l-4 border-l-blue-500 transition-colors ${darkMode ? 'bg-blue-500/5' : 'bg-blue-50'}`}>
+                            <div className="text-[10px] font-black uppercase text-blue-500 mb-1">🔗 Postare Asimilată</div>
+                            <div className="font-bold text-sm sm:text-base mb-1">{linkedPost.translatedTitle || linkedPost.title}</div>
+                            <div className="text-xs opacity-70 line-clamp-2">{linkedPost.translatedContent || linkedPost.content}</div>
+                        </div>
+                    );
+                })()}
+
+                {selectedPost.type === 'activity' && pTimer && !isRegExpired && (
+                    <div className="mb-6 w-full text-center py-3 rounded-xl bg-orange-500/10 text-orange-500 font-bold border border-orange-500/20 text-sm">
+                        ⏳ Înscrierile se închid în: <span className="font-black ml-1">{pTimer}</span>
+                    </div>
+                )}
+
+                {selectedPost.type === 'activity' && user?.class !== 'Absolvent' && !isRegExpired && (
                   <button onClick={(e) => handleRegisterClick(e, selectedPost)} className={`w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl font-black text-base sm:text-lg shadow-xl transition-all ${
                         (selectedPost.isTeamEvent ? selectedPost.teams?.some((t:any)=>t.leaderId===user.id || t.members?.some((m:any)=>m.id===user.id)) : selectedPost.attendees?.some((a:any)=>a.id===user.id)) 
                         ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white' 
@@ -769,6 +847,14 @@ export default function Dashboard() {
                       {selectedPost.isTeamEvent ? (selectedPost.teams?.some((t:any)=>t.leaderId===user.id || t.members?.some((m:any)=>m.id===user.id)) ? t.teamManage : t.teamJoin) : (selectedPost.attendees?.some((a:any)=>a.id===user.id) ? t.cancel : t.join)}
                   </button>
                 )}
+
+                {selectedPost.type === 'activity' && user?.class !== 'Absolvent' && isRegExpired && (
+                  <div className="w-full text-center py-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex flex-col items-center gap-2">
+                      <span className="font-black text-red-500 uppercase tracking-widest text-sm">Timpul a expirat</span>
+                      <button onClick={(e) => {e.stopPropagation(); alert(`📞 Pentru modificări, contactează organizatorul:\n${selectedPost.organizerPhone || "Nu a fost specificat"}`)}} className="text-xs font-bold text-red-400 hover:text-red-500 underline">Contactează organizatorul</button>
+                  </div>
+                )}
+
                 {selectedPost.type === 'activity' && user?.class === 'Absolvent' && (
                   <div className="w-full py-4 text-center rounded-2xl bg-red-500/10 text-red-500 border border-red-500/20 font-bold">
                       Absolvenții nu pot rezerva locuri la evenimentele active.
@@ -777,7 +863,8 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-      )}
+          )
+      })()}
     </div>
   );
 }

@@ -15,7 +15,6 @@ export default function AdminPanel() {
   const [darkMode, setDarkMode] = useState(true);
   
   const [currentUserRole, setCurrentUserRole] = useState<string>("user");
-  // NOU: Salvăm și ID-ul userului curent pentru a-l compara cu authorId la postări
   const [currentUserId, setCurrentUserId] = useState<string>("");
 
   const [title, setTitle] = useState("");
@@ -24,6 +23,9 @@ export default function AdminPanel() {
   const [authorName, setAuthorName] = useState("");
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
   
+  const [linkedPostId, setLinkedPostId] = useState("");
+  const [regDeadline, setRegDeadline] = useState("");
+
   const [notifTitle, setNotifTitle] = useState("");
   const [notifBody, setNotifBody] = useState("");
   const [selectedClassNotif, setSelectedClassNotif] = useState("Toată Școala");
@@ -93,17 +95,12 @@ export default function AdminPanel() {
     fetchData();
   };
 
-  const handleDeleteMessage = async (id: string) => {
-      if(!confirm("Ești sigur că vrei să ștergi acest mesaj?")) return;
-      await deleteDoc(doc(db, "admin_messages", id));
-  };
-
   const resetForm = () => {
       setTitle(""); setContent(""); setImageUrl(""); setAuthorName(""); setOrganizerPhone("");
       setSelectedClasses([]); setStartDate(""); setEndDate(""); setStartTime("");
       setEndTime(""); setHasTime(false); setEvLoc(""); setSpots(0);
       setIsTeamEvent(false); setTeamSize(2); setTeamRule("any");
-      setEditingPost(null);
+      setEditingPost(null); setLinkedPostId(""); setRegDeadline("");
   };
 
   const handleTabSwitch = (tabId: string) => {
@@ -111,16 +108,113 @@ export default function AdminPanel() {
       resetForm();
   };
 
+  // --- FUNCȚIILE CARE LIPSEAU AU FOST ADAUGATE AICI ---
+
+  const toggleClass = (c: string) => {
+      setSelectedClasses(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
+  };
+
+  const handlePromoteAll = async () => {
+      if(!confirm("Ești sigur? Această acțiune va muta toți elevii în anul următor (ex: a 9-a devine a 10-a, a 12-a devine Absolvent).")) return;
+      
+      let count = 0;
+      for (const u of users) {
+          if(u.role === 'profesor' || u.class === 'Absolvent' || !u.class) continue;
+          let match = u.class.match(/(\d+)(.*)/);
+          if(match) {
+              let grade = parseInt(match[1]);
+              let letter = match[2];
+              let newClass = grade >= 12 ? "Absolvent" : `${grade + 1}${letter}`;
+              await updateDoc(doc(db, "users", u.id), { class: newClass });
+              count++;
+          }
+      }
+      alert(`✅ Au fost promovați cu succes ${count} elevi!`);
+      fetchData();
+  };
+
+  const handleUserClassChange = async (userId: string, newClass: string) => {
+      await updateDoc(doc(db, "users", userId), { class: newClass });
+      setUsers(users.map(u => u.id === userId ? { ...u, class: newClass } : u));
+  };
+
+  const handleUserRoleChange = async (userId: string, newRole: string) => {
+      await updateDoc(doc(db, "users", userId), { role: newRole });
+      setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
+  };
+
+  const showUserHistory = async (user: any) => {
+      const history: any[] = [];
+      const evSnap = await getDocs(collection(db, "calendar_events"));
+      evSnap.forEach(d => {
+          const ev = d.data();
+          if (ev.attendees?.some((a:any) => a.id === user.id)) {
+              history.push({ eventTitle: ev.title, role: 'Participant', date: new Date(ev.date).toLocaleDateString('ro-RO') });
+          }
+          ev.teams?.forEach((t:any) => {
+              if (t.leaderId === user.id) history.push({ eventTitle: ev.title, role: 'Lider Echipă', date: new Date(ev.date).toLocaleDateString('ro-RO') });
+              else if (t.members?.some((m:any) => m.id === user.id)) history.push({ eventTitle: ev.title, role: 'Membru Echipă', date: new Date(ev.date).toLocaleDateString('ro-RO') });
+          });
+      });
+      setViewUserHistory({ ...user, history });
+  };
+
+  const handleSendNotif = async () => {
+      if (!notifTitle || !notifBody) return alert("Completează ambele câmpuri!");
+      const targets = selectedClassNotif === "Toată Școala" ? users : users.filter(u => u.class === selectedClassNotif);
+      
+      let count = 0;
+      for (const u of targets) {
+          await addDoc(collection(db, "users", u.id, "notifications"), {
+              title: notifTitle, message: notifBody, sentAt: new Date().toISOString(), read: false
+          });
+          count++;
+      }
+      alert(`✅ Notificare trimisă cu succes către ${count} utilizatori!`);
+      setNotifTitle(""); setNotifBody("");
+  };
+
+  const handleDeleteMessage = async (msgId: string) => {
+      await deleteDoc(doc(db, "admin_messages", msgId));
+  };
+
+  const handleFileUpload = (e: any) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+          if (evt.target?.result) setEmailList(prev => prev + (prev ? "\n" : "") + evt.target.result);
+      };
+      reader.readAsText(file);
+  };
+
+  const handleAddWhitelist = async () => {
+      const emails = emailList.split(/[\n,]+/).map(e => e.trim().toLowerCase()).filter(e => e.includes("@"));
+      let added = 0;
+      for (const e of emails) {
+          if (!whitelistDb.find(w => w.id === e)) {
+              await setDoc(doc(db, "whitelist", e), { addedAt: new Date().toISOString() });
+              added++;
+          }
+      }
+      alert(`✅ S-au adăugat ${added} adrese de email noi in Whitelist.`);
+      setEmailList(""); fetchData();
+  };
+
+  // --------------------------------------------------------
+
   const handleEditClick = (post: any) => {
       setEditingPost(post);
       setTitle(post.title || ""); setContent(post.content || ""); setImageUrl(post.imageUrl || "");
       setAuthorName(post.authorName || post.organizers || ""); setSelectedClasses(post.targetClasses || ["Toată Școala"]);
+      setLinkedPostId(post.linkedPostId || "");
       
       if(post.col === 'calendar_events') {
           setEventType(post.type); setStartDate(post.date?.split('T')[0] || ""); setEndDate(post.endDate?.split('T')[0] || "");
           setHasTime(post.hasTime || false); setStartTime(post.startTime || ""); setEndTime(post.endTime || "");
           setEvLoc(post.location || ""); setSpots(post.maxSpots || 0); setOrganizerPhone(post.organizerPhone || "");
           setIsTeamEvent(post.isTeamEvent || false); setTeamSize(post.teamSize || 2); setTeamRule(post.teamRule || "any");
+          setRegDeadline(post.registrationDeadline || "");
       }
   };
 
@@ -130,6 +224,7 @@ export default function AdminPanel() {
       
       if (editingPost.col === 'news') {
           updatedData.authorName = authorName;
+          updatedData.linkedPostId = linkedPostId;
       } else {
           const finalDateISO = startDate ? (hasTime && startTime ? `${startDate}T${startTime}` : `${startDate}T00:00:00`) : new Date().toISOString();
           const finalEndDateISO = endDate ? (hasTime && endTime ? `${endDate}T${endTime}` : `${endDate}T00:00:00`) : finalDateISO;
@@ -141,6 +236,7 @@ export default function AdminPanel() {
               updatedData.location = evLoc; updatedData.organizers = authorName; updatedData.maxSpots = spots;
               updatedData.organizerPhone = organizerPhone;
               updatedData.isTeamEvent = isTeamEvent;
+              updatedData.registrationDeadline = regDeadline;
               if(isTeamEvent) { updatedData.teamSize = teamSize; updatedData.teamRule = teamRule; }
           }
       }
@@ -155,7 +251,7 @@ export default function AdminPanel() {
     await addDoc(collection(db, "news"), { 
         type: "official_news", title, content, imageUrl, 
         authorName: authorName || (currentUserRole === 'profesor' ? "Profesor" : "Consiliul Elevilor"), 
-        authorId: currentUserId, // NOU: Salvăm cine a creat postarea
+        authorId: currentUserId, linkedPostId,
         targetClasses: selectedClasses.length === 0 ? ["Toată Școala"] : selectedClasses, postedAt: new Date().toISOString(), likes: []
     });
     alert("✅ Știre Publicată!"); resetForm(); fetchData();
@@ -168,13 +264,13 @@ export default function AdminPanel() {
 
     const eventData: any = { 
         type: eventType, title, content, imageUrl, date: finalDateISO, endDate: finalEndDateISO, hasTime, startTime, endTime,
-        authorId: currentUserId, // NOU: Salvăm cine a creat evenimentul
+        authorId: currentUserId, 
         targetClasses: selectedClasses.length === 0 ? ["Toată Școala"] : selectedClasses, postedAt: new Date().toISOString(), likes: []
     };
 
     if (eventType === 'activity') {
         eventData.location = evLoc; eventData.organizers = authorName || (currentUserRole === 'profesor' ? "Profesor" : "Consiliul Elevilor"); eventData.maxSpots = spots;
-        eventData.organizerPhone = organizerPhone; 
+        eventData.organizerPhone = organizerPhone; eventData.registrationDeadline = regDeadline;
         if(isTeamEvent) { eventData.isTeamEvent = true; eventData.teamSize = teamSize; eventData.teamRule = teamRule; eventData.teams = []; } 
         else { eventData.attendees = []; }
     }
@@ -182,89 +278,30 @@ export default function AdminPanel() {
     alert("✅ Salvat cu succes în Calendar!"); resetForm(); fetchData();
   };
 
-  const handleSendNotif = async () => {
-    if(!notifTitle || !notifBody) return alert("Completează titlul și mesajul!");
-    const targetUsers = selectedClassNotif === "Toată Școala" ? users : users.filter(u => u.class === selectedClassNotif);
-    if(targetUsers.length === 0) return alert("Nu există elevi în această clasă.");
-    if(!confirm(`Trimitem notificarea către ${targetUsers.length} elevi?`)) return;
-
-    for (const u of targetUsers) {
-      await addDoc(collection(db, "users", u.id, "notifications"), { title: notifTitle, message: notifBody, sentAt: new Date().toISOString(), read: false });
-    }
-    alert("🚀 Notificări trimise cu succes!"); setNotifTitle(""); setNotifBody("");
-  };
-
-  const handleAddWhitelist = async () => {
-    const rawEmails = emailList.split(/[\n,]+/).map(e => e.trim().toLowerCase()).filter(e => e);
-    let count = 0;
-    for (let email of rawEmails) {
-      if (!email.includes('@')) email = `${email}@ghibabirta.ro`;
-      await setDoc(doc(db, "whitelist", email), { allowed: true, addedAt: new Date().toISOString() }); count++;
-    }
-    alert(`✅ ${count} conturi au fost autorizate!`); setEmailList(""); fetchData();
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => setEmailList(prev => prev ? prev + '\n' + (event.target?.result as string) : (event.target?.result as string));
-    reader.readAsText(file); e.target.value = "";
-  };
-
-  const showUserHistory = (userItem: any) => {
-      const history = posts.filter(p => p.col === 'calendar_events' && p.type === 'activity').filter(p => {
-          if (p.isTeamEvent && p.teams) { return p.teams.some((t:any) => t.leaderId === userItem.id || t.members?.some((m:any) => m.id === userItem.id)); } 
-          else if (p.attendees) { return p.attendees.some((a:any) => a.id === userItem.id); } return false;
-      }).map(p => {
-          let joinedAt = "Necunoscut"; let role = "Participant";
-          if (p.isTeamEvent) {
-              const team = p.teams.find((t:any) => t.leaderId === userItem.id || t.members?.some((m:any) => m.id === userItem.id));
-              joinedAt = team?.registeredAt ? new Date(team.registeredAt).toLocaleString('ro-RO') : joinedAt;
-              if(team?.leaderId === userItem.id) role = "Lider Echipă"; else role = "Membru Echipă";
-          } else {
-              const att = p.attendees.find((a:any) => a.id === userItem.id);
-              joinedAt = att?.joinedAt ? new Date(att.joinedAt).toLocaleString('ro-RO') : joinedAt;
-          }
-          return { eventTitle: p.title, date: joinedAt, role };
-      });
-      setViewUserHistory({ ...userItem, history });
-  };
-
-  const toggleClass = (c: string) => setSelectedClasses(prev => prev.includes(c) ? prev.filter(x=>x!==c) : [...prev, c]);
-
-  const handleUserClassChange = async (userId: string, newClass: string) => {
-      if (!confirm(`Ești sigur că vrei să schimbi clasa acestui elev în ${newClass}? (Va fi notificat la logare)`)) return;
-      await updateDoc(doc(db, "users", userId), { class: newClass });
-      alert("✅ Clasa a fost actualizată!");
+  const removeAttendeeAdmin = async (event: any, attendeeId: string) => {
+      if(!confirm("Ești sigur că vrei să elimini acest participant?")) return;
+      const newAttendees = event.attendees.filter((a:any) => a.id !== attendeeId);
+      await updateDoc(doc(db, "calendar_events", event.id), { attendees: newAttendees });
+      setViewAttendeesModal({...event, attendees: newAttendees});
       fetchData();
   };
 
-  const handleUserRoleChange = async (userId: string, newRole: string) => {
-      if (!confirm(`Ești sigur că vrei să îi oferi acestui utilizator rolul de ${newRole.toUpperCase()}?`)) return;
-      await updateDoc(doc(db, "users", userId), { role: newRole });
-      alert("✅ Rolul a fost actualizat!");
+  const removeTeamAdmin = async (event: any, teamLeaderId: string) => {
+      if(!confirm("Dizolvi complet această echipă?")) return;
+      const newTeams = event.teams.filter((t:any) => t.leaderId !== teamLeaderId);
+      await updateDoc(doc(db, "calendar_events", event.id), { teams: newTeams });
+      setViewAttendeesModal({...event, teams: newTeams});
       fetchData();
   };
 
-  const handlePromoteAll = async () => {
-      if (!confirm("⚠️ ATENȚIE! Această acțiune va avansa toți elevii cu un an (ex: 9 A devine 10 A). Elevii de a 12-a vor deveni 'Absolvenți'. Ești absolut sigur?")) return;
-      
-      let count = 0;
-      for (const u of users) {
-          if (!u.class || u.class === "Profesor" || u.class === "Absolvent") continue;
-          
-          let newClass = u.class;
-          if (newClass.startsWith("9 ")) newClass = newClass.replace("9 ", "10 ");
-          else if (newClass.startsWith("10 ")) newClass = newClass.replace("10 ", "11 ");
-          else if (newClass.startsWith("11 ")) newClass = newClass.replace("11 ", "12 ");
-          else if (newClass.startsWith("12 ")) newClass = "Absolvent";
-
-          if (newClass !== u.class) {
-              await updateDoc(doc(db, "users", u.id), { class: newClass });
-              count++;
-          }
-      }
-      alert(`✅ Succes! ${count} elevi au fost promovați în anul următor.`);
+  const removeTeamMemberAdmin = async (event: any, teamLeaderId: string, memberId: string) => {
+      if(!confirm("Elimini acest membru din echipă?")) return;
+      const teamToEdit = event.teams.find((t:any) => t.leaderId === teamLeaderId);
+      const updatedMembers = teamToEdit.members.filter((m:any) => m.id !== memberId);
+      const updatedTeam = { ...teamToEdit, members: updatedMembers };
+      const newTeams = event.teams.map((t:any) => t.leaderId === teamLeaderId ? updatedTeam : t);
+      await updateDoc(doc(db, "calendar_events", event.id), { teams: newTeams });
+      setViewAttendeesModal({...event, teams: newTeams});
       fetchData();
   };
 
@@ -303,7 +340,6 @@ export default function AdminPanel() {
                 <h2 className="text-2xl font-black mb-6">⚙️ Moderează Postările</h2>
                 <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                     {posts.map(p => {
-                        // NOU: Condiția pentru permisiuni (Admin = Tot, Profesor = Doar ale lui)
                         const canModify = currentUserRole === 'admin' || (currentUserRole === 'profesor' && p.authorId === currentUserId);
 
                         return (
@@ -324,7 +360,6 @@ export default function AdminPanel() {
                                     </button>
                                 )}
                                 
-                                {/* Afișăm butoanele de edit/ștergere doar dacă are voie */}
                                 {canModify && (
                                     <>
                                         <button onClick={() => handleEditClick(p)} className="bg-orange-500/10 text-orange-500 px-4 py-2.5 rounded-xl font-bold hover:bg-orange-600 hover:text-white transition">Editează</button>
@@ -338,7 +373,6 @@ export default function AdminPanel() {
             </div>
         )}
 
-        {/* --- MODAL DE EDITARE POSTARE --- */}
         {editingPost && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto custom-scrollbar animate-popup">
                 <form onSubmit={handleUpdatePost} className={`border p-8 rounded-[2.5rem] w-full max-w-3xl shadow-2xl relative my-auto ${cardBg}`}>
@@ -351,8 +385,22 @@ export default function AdminPanel() {
                     </div>
 
                     {editingPost.col === 'calendar_events' && editingPost.type === 'activity' && (
-                        <div className="mb-4">
+                        <div className="grid sm:grid-cols-2 gap-4 mb-4">
                              <input placeholder="Telefon Organizator (Obligatoriu)" type="tel" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={organizerPhone} onChange={e=>setOrganizerPhone(e.target.value.replace(/\D/g,'').slice(0,10))} required />
+                             <div>
+                                 <label className="text-[10px] font-black uppercase opacity-50 block mb-1">Dată Limită Înscriere (Opțional)</label>
+                                 <input type="datetime-local" className={`w-full p-3 rounded-xl border ${inputBg}`} value={regDeadline} onChange={e=>setRegDeadline(e.target.value)} />
+                             </div>
+                        </div>
+                    )}
+
+                    {editingPost.col === 'news' && (
+                        <div className="mb-4">
+                            <label className="text-[10px] font-black uppercase text-blue-500 block mb-1">🔗 Etichetează o altă postare (Opțional)</label>
+                            <select value={linkedPostId} onChange={e=>setLinkedPostId(e.target.value)} className={`w-full p-4 rounded-2xl border outline-none ${inputBg}`}>
+                                <option value="">Fără etichetare</option>
+                                {posts.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+                            </select>
                         </div>
                     )}
 
@@ -398,7 +446,6 @@ export default function AdminPanel() {
             </div>
         )}
 
-        {/* --- TAB-UL USERS (DOAR ADMIN) --- */}
         {activeTab === "users" && currentUserRole === 'admin' && (
           <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
@@ -420,14 +467,12 @@ export default function AdminPanel() {
                       <div className="flex flex-wrap items-center gap-3">
                           <p className="text-xs opacity-50 font-mono">{u.email}</p>
                           
-                          {/* Schimbare Clasă */}
                           <select value={u.class || ""} onChange={(e) => handleUserClassChange(u.id, e.target.value)} className={`text-xs p-1.5 rounded-lg border outline-none font-bold ${darkMode ? 'bg-slate-800 text-white border-white/20' : 'bg-white text-black border-slate-300'}`}>
                               <option value="Profesor">Profesor</option>
                               <option value="Absolvent">Absolvent</option>
                               {SCHOOL_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
 
-                          {/* Schimbare Rol de Securitate */}
                           <select value={u.role || "user"} onChange={(e) => handleUserRoleChange(u.id, e.target.value)} className={`text-xs p-1.5 rounded-lg border outline-none font-bold ${darkMode ? 'bg-slate-800 text-blue-400 border-white/20' : 'bg-white text-blue-600 border-slate-300'}`}>
                               <option value="user">Rol: Elev</option>
                               <option value="profesor">Rol: Profesor</option>
@@ -451,6 +496,13 @@ export default function AdminPanel() {
                 <div className="grid sm:grid-cols-2 gap-4 mb-4">
                     <input placeholder="Titlu Postare" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={title} onChange={e=>setTitle(e.target.value)} required />
                     <input placeholder="Autor (ex: Director)" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={authorName} onChange={e=>setAuthorName(e.target.value)} />
+                </div>
+                <div className="mb-4">
+                    <label className="text-[10px] font-black uppercase text-blue-500 block mb-2">🔗 Etichetează o altă postare (Opțional)</label>
+                    <select value={linkedPostId} onChange={e=>setLinkedPostId(e.target.value)} className={`w-full p-4 rounded-2xl border outline-none font-bold ${inputBg}`}>
+                        <option value="">Fără etichetare</option>
+                        {posts.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+                    </select>
                 </div>
                 <textarea placeholder="Conținutul anunțului..." className={`w-full p-4 rounded-2xl outline-none border h-32 resize-none mb-4 ${inputBg}`} value={content} onChange={e=>setContent(e.target.value)} required />
                 <div className="mb-6"><label className="text-[10px] font-black uppercase opacity-50 block mb-2">Imagine Copertă (URL Extern)</label><input placeholder="Ex: https://imgur.com/poza.jpg" value={imageUrl} onChange={e=>setImageUrl(e.target.value)} className={`w-full p-4 rounded-xl border ${inputBg}`} /></div>
@@ -477,9 +529,15 @@ export default function AdminPanel() {
                 </div>
 
                 {eventType === 'activity' && (
-                    <div className="mb-4 animate-fade-in">
-                        <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Telefon Organizator (Pentru Contact)</label>
-                        <input placeholder="Ex: 0712345678" type="tel" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={organizerPhone} onChange={e=>setOrganizerPhone(e.target.value.replace(/\D/g,'').slice(0,10))} required />
+                    <div className="grid sm:grid-cols-2 gap-4 mb-4 animate-fade-in">
+                        <div>
+                            <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Telefon Organizator (Obligatoriu)</label>
+                            <input placeholder="Ex: 0712345678" type="tel" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={organizerPhone} onChange={e=>setOrganizerPhone(e.target.value.replace(/\D/g,'').slice(0,10))} required />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Dată Limită Înscrieri (Opțional Timer)</label>
+                            <input type="datetime-local" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={regDeadline} onChange={e=>setRegDeadline(e.target.value)} />
+                        </div>
                     </div>
                 )}
 
@@ -530,7 +588,6 @@ export default function AdminPanel() {
             </form>
         )}
 
-        {/* --- TAB-UL NOTIFICĂRI & INBOX MESAJE UTILIZATORI (DOAR ADMIN) --- */}
         {activeTab === "notif" && currentUserRole === 'admin' && (
             <div className="grid lg:grid-cols-2 gap-8">
                 <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
@@ -572,7 +629,6 @@ export default function AdminPanel() {
             </div>
         )}
 
-        {/* --- TAB-UL APROBĂRI (DOAR ADMIN) --- */}
         {activeTab === "whitelist" && currentUserRole === 'admin' && (
             <div className="grid lg:grid-cols-2 gap-8">
                 <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
@@ -598,11 +654,10 @@ export default function AdminPanel() {
             </div>
         )}
 
-        {/* MODAL ISTORIC ELEV */}
         {viewUserHistory && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-popup">
                 <div className={`border p-8 rounded-[2.5rem] w-full max-w-lg shadow-2xl relative ${darkMode ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200 text-slate-900'}`}>
-                    <button onClick={() => setViewUserHistory(null)} className="absolute top-6 right-6 w-8 h-8 bg-white/10 rounded-full font-bold">✕</button>
+                    <button onClick={() => setViewUserHistory(null)} className="absolute top-6 right-6 w-8 h-8 bg-black/10 dark:bg-white/10 rounded-full font-bold">✕</button>
                     <h2 className="text-2xl font-black mb-1">Istoric Activitate</h2>
                     <p className="text-xs text-blue-500 font-bold uppercase tracking-wider mb-2">{viewUserHistory.name}</p>
                     <p className="text-[10px] opacity-50 font-mono mb-6">Înregistrat pe site: {viewUserHistory.termsAcceptedAt ? new Date(viewUserHistory.termsAcceptedAt).toLocaleDateString('ro-RO') : 'Necunoscut'}</p>
@@ -613,7 +668,7 @@ export default function AdminPanel() {
                                 <div className="font-bold text-sm mb-1">{h.eventTitle}</div>
                                 <div className="flex justify-between items-center text-[10px] font-mono opacity-60">
                                     <span>Rol: <strong className="text-red-400">{h.role}</strong></span>
-                                    <span>Data Înscrierii: {h.date}</span>
+                                    <span>Data: {h.date}</span>
                                 </div>
                             </div>
                         ))}
@@ -622,11 +677,10 @@ export default function AdminPanel() {
             </div>
         )}
 
-        {/* MODAL LISTA PARTICIPANTI */}
         {viewAttendeesModal && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-popup">
                 <div className={`border p-8 rounded-[2.5rem] w-full max-w-2xl shadow-2xl relative ${darkMode ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200 text-slate-900'}`}>
-                    <button onClick={() => setViewAttendeesModal(null)} className="absolute top-6 right-6 w-8 h-8 bg-white/10 rounded-full font-bold">✕</button>
+                    <button onClick={() => setViewAttendeesModal(null)} className="absolute top-6 right-6 w-8 h-8 bg-black/10 dark:bg-white/10 rounded-full font-bold hover:rotate-90 transition-transform">✕</button>
                     <h2 className="text-2xl font-black mb-1">{viewAttendeesModal.isTeamEvent ? "Echipe Înscrise" : "Lista Participanți"}</h2>
                     <p className="text-xs text-green-500 font-bold uppercase tracking-wider mb-6">{viewAttendeesModal.title}</p>
                     
@@ -635,19 +689,25 @@ export default function AdminPanel() {
                             viewAttendeesModal.teams?.length === 0 ? <p className="text-sm italic opacity-60">Nicio echipă înscrisă.</p> :
                             viewAttendeesModal.teams?.map((t:any, idx:number) => (
                                 <div key={idx} className={`p-4 rounded-2xl border ${darkMode ? 'bg-black/40 border-white/10' : 'bg-slate-50 border-slate-300'}`}>
-                                    <div className="flex justify-between items-center mb-3 pb-2 border-b border-white/10">
+                                    <div className="flex justify-between items-center mb-3 pb-2 border-b border-black/10 dark:border-white/10">
                                         <div className="font-black text-sm text-red-500">Echipa #{idx + 1}</div>
-                                        <div className="text-[10px] opacity-50 font-mono">Înscris: {new Date(t.registeredAt).toLocaleString('ro-RO')}</div>
+                                        <div className="flex items-center gap-3">
+                                            <div className="text-[10px] opacity-50 font-mono">Înscris: {new Date(t.registeredAt).toLocaleString('ro-RO')}</div>
+                                            <button onClick={() => removeTeamAdmin(viewAttendeesModal, t.leaderId)} className="text-[10px] bg-red-500/10 text-red-500 px-2 py-1 rounded hover:bg-red-500 hover:text-white transition font-bold">Șterge Echipa</button>
+                                        </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <div className="flex justify-between text-xs font-bold bg-white/5 p-2 rounded-lg">
+                                        <div className="flex justify-between items-center text-xs font-bold bg-black/5 dark:bg-white/5 p-2 rounded-lg">
                                             <span>👑 {t.leaderName} (Lider) <span className="opacity-50 text-[10px] ml-2">{t.leaderClass}</span></span>
                                             <span className="opacity-60 font-mono">{t.leaderPhone}</span>
                                         </div>
                                         {t.members?.map((m:any, i:number) => (
-                                            <div key={i} className="flex justify-between text-xs p-2">
+                                            <div key={i} className="flex justify-between items-center text-xs p-2">
                                                 <span>👤 {m.name} <span className="opacity-50 text-[10px] ml-2">{m.class}</span></span>
-                                                <span className="opacity-60 font-mono">{m.phone}</span>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="opacity-60 font-mono">{m.phone}</span>
+                                                    <button onClick={() => removeTeamMemberAdmin(viewAttendeesModal, t.leaderId, m.id)} className="text-[10px] text-red-500 hover:underline font-bold">🗑️ Elimina</button>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
@@ -658,7 +718,10 @@ export default function AdminPanel() {
                             viewAttendeesModal.attendees?.map((a:any, idx:number) => (
                                 <div key={idx} className={`flex justify-between items-center p-3 rounded-xl border ${darkMode ? 'bg-black/40 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
                                     <div className="font-bold text-sm">{idx + 1}. {a.name} <span className="opacity-50 text-[10px] ml-2">{a.class}</span></div>
-                                    <div className="text-[10px] font-mono opacity-60">{a.phone}</div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="text-[10px] font-mono opacity-60">{a.phone}</div>
+                                        <button onClick={() => removeAttendeeAdmin(viewAttendeesModal, a.id)} className="text-[10px] bg-red-500/10 text-red-500 px-2 py-1 rounded hover:bg-red-500 hover:text-white transition font-bold">Elimină</button>
+                                    </div>
                                 </div>
                             ))
                         )}
