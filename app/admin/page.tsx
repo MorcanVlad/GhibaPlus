@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
-import { auth, db, storage } from "../lib/firebase"; // <-- Adăugat storage
+import { auth, db, storage } from "../lib/firebase"; 
 import { useRouter } from "next/navigation";
 import { doc, getDoc, collection, addDoc, setDoc, getDocs, deleteDoc, updateDoc, onSnapshot, query, orderBy } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; // <-- Importuri noi
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; 
 import { SCHOOL_CLASSES } from "../lib/constants";
 
 export default function AdminPanel() {
@@ -21,7 +21,7 @@ export default function AdminPanel() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [imageUrl, setImageUrl] = useState("");
-  const [isUploadingImg, setIsUploadingImg] = useState(false); // <-- State nou pentru upload
+  const [isUploadingImg, setIsUploadingImg] = useState(false); 
   
   const [authorName, setAuthorName] = useState("");
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
@@ -111,7 +111,6 @@ export default function AdminPanel() {
       resetForm();
   };
 
-  // NOU: Funcția de Upload Poze
   const handleUploadCover = async (e: any) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -195,12 +194,19 @@ export default function AdminPanel() {
   };
 
   const handleAddWhitelist = async () => {
-      const emails = emailList.split(/[\n,]+/).map(e => e.trim().toLowerCase()).filter(e => e.includes("@"));
+      // Reparat: Dacă nu conține '@', se adaugă automat '@ghibabirta.ro'
+      const emails = emailList.split(/[\n,]+/)
+          .map(e => e.trim().toLowerCase())
+          .filter(e => e.length > 0)
+          .map(e => e.includes("@") ? e : `${e}@ghibabirta.ro`);
+          
       let added = 0;
       for (const e of emails) {
           if (!whitelistDb.find(w => w.id === e)) { await setDoc(doc(db, "whitelist", e), { addedAt: new Date().toISOString() }); added++; }
       }
-      alert(`✅ S-au adăugat ${added} adrese.`); setEmailList(""); fetchData();
+      alert(`✅ S-au adăugat ${added} adrese în Whitelist.`); 
+      setEmailList(""); 
+      fetchData();
   };
 
   const handleEditClick = (post: any) => {
@@ -290,6 +296,29 @@ export default function AdminPanel() {
       const newTeams = event.teams.map((t:any) => t.leaderId === teamLeaderId ? updatedTeam : t);
       await updateDoc(doc(db, "calendar_events", event.id), { teams: newTeams });
       setViewAttendeesModal({...event, teams: newTeams}); fetchData();
+  };
+
+  const downloadCSV = () => {
+      let csvContent = "data:text/csv;charset=utf-8,\uFEFFNume,Clasa,Telefon,Rol\n";
+      if (viewAttendeesModal.isTeamEvent) {
+           viewAttendeesModal.teams?.forEach((t: any) => {
+               csvContent += `${t.leaderName},${t.leaderClass},${t.leaderPhone},Lider\n`;
+               t.members?.forEach((m: any) => {
+                   csvContent += `${m.name},${m.class},${m.phone},Membru\n`;
+               });
+           });
+      } else {
+           viewAttendeesModal.attendees?.forEach((a: any) => {
+               csvContent += `${a.name},${a.class},${a.phone},Participant\n`;
+           });
+      }
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Participanti_${viewAttendeesModal.title.replace(/\s+/g, '_')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
   };
 
   const bgMain = darkMode ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-800";
@@ -401,10 +430,16 @@ export default function AdminPanel() {
                             )}
 
                             {eventType === 'activity' && (
-                                <div className="grid sm:grid-cols-2 gap-4 mb-6">
-                                    <div><label className="text-[10px] font-black uppercase opacity-50 block mb-2">LOCAȚIE</label><input className={`w-full p-4 rounded-2xl border ${inputBg}`} value={evLoc} onChange={e=>setEvLoc(e.target.value)} required /></div>
-                                    <div><label className="text-[10px] font-black uppercase opacity-50 block mb-2">LOCURI (0 = Nelimitat)</label><input type="number" min="0" className={`w-full p-4 rounded-2xl border ${inputBg}`} value={spots} onChange={e=>setSpots(Number(e.target.value))} required /></div>
-                                </div>
+                                <>
+                                    <div className="grid sm:grid-cols-2 gap-4 mb-4">
+                                        <div><label className="text-[10px] font-black uppercase opacity-50 block mb-2">Telefon Organizator</label><input type="tel" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={organizerPhone} onChange={e=>setOrganizerPhone(e.target.value.replace(/\D/g,'').slice(0,10))} required /></div>
+                                        <div><label className="text-[10px] font-black uppercase opacity-50 block mb-2">Dată Limită Înscrieri (Timer)</label><input type="datetime-local" className={`w-full p-4 rounded-2xl outline-none border ${inputBg}`} value={regDeadline} onChange={e=>setRegDeadline(e.target.value)} /></div>
+                                    </div>
+                                    <div className="grid sm:grid-cols-2 gap-4 mb-6">
+                                        <div><label className="text-[10px] font-black uppercase opacity-50 block mb-2">LOCAȚIE</label><input className={`w-full p-4 rounded-2xl border ${inputBg}`} value={evLoc} onChange={e=>setEvLoc(e.target.value)} required /></div>
+                                        <div><label className="text-[10px] font-black uppercase opacity-50 block mb-2">LOCURI (0 = Nelimitat)</label><input type="number" min="0" className={`w-full p-4 rounded-2xl border ${inputBg}`} value={spots} onChange={e=>setSpots(Number(e.target.value))} required /></div>
+                                    </div>
+                                </>
                             )}
                         </div>
                     )}
@@ -569,7 +604,6 @@ export default function AdminPanel() {
             </form>
         )}
 
-        {/* ... Codul pt. modal de Inbox & Aprobare (Notif, Whitelist) e la fel ... */}
         {activeTab === "notif" && currentUserRole === 'admin' && (
             <div className="grid lg:grid-cols-2 gap-8">
                 <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
@@ -609,7 +643,7 @@ export default function AdminPanel() {
                         <h2 className="text-xl font-black">Adaugă Emailuri</h2>
                         <label className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold cursor-pointer shadow-lg flex items-center gap-2">📁 .txt / .csv <input type="file" accept=".txt,.csv" onChange={handleFileUpload} className="hidden" /></label>
                     </div>
-                    <textarea value={emailList} onChange={e => setEmailList(e.target.value)} className={`w-full p-4 rounded-2xl outline-none border h-48 resize-none font-mono text-sm leading-relaxed ${inputBg}`} placeholder="popescu.ion&#10;ionescu.maria"/>
+                    <textarea value={emailList} onChange={e => setEmailList(e.target.value)} className={`w-full p-4 rounded-2xl outline-none border h-48 resize-none font-mono text-sm leading-relaxed ${inputBg}`} placeholder="popescu.ion&#10;sau&#10;popescu.ion@ghibabirta.ro"/>
                     <button onClick={handleAddWhitelist} className={`w-full py-4 rounded-2xl font-black transition mt-6 ${darkMode ? 'bg-white text-black hover:bg-gray-200' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>Validează Lista</button>
                 </div>
                 <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
@@ -626,7 +660,71 @@ export default function AdminPanel() {
                 </div>
             </div>
         )}
+
       </div>
+
+      {/* MODAL PARTICIPANȚI / ECHIPE & DOWNLOAD CSV */}
+      {viewAttendeesModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+              <div className={`w-full max-w-2xl p-6 sm:p-8 rounded-[2.5rem] border shadow-2xl relative animate-popup ${cardBg}`}>
+                  <button onClick={() => setViewAttendeesModal(null)} className="absolute top-6 right-6 w-10 h-10 bg-black/10 dark:bg-white/10 rounded-full font-bold">✕</button>
+                  <h2 className="text-2xl font-black mb-6 flex justify-between items-center pr-12">
+                      <span>👥 Participanți: {viewAttendeesModal.title}</span>
+                  </h2>
+                  <button onClick={downloadCSV} className="mb-6 bg-green-600 text-white px-5 py-3 rounded-xl font-black hover:bg-green-500 transition shadow-lg shadow-green-500/20">📥 Descarcă Tabel (Excel/CSV)</button>
+                  
+                  <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                      {viewAttendeesModal.isTeamEvent ? (
+                          viewAttendeesModal.teams?.length === 0 ? <p className="opacity-50 italic">Nicio echipă înscrisă momentan.</p> :
+                          viewAttendeesModal.teams?.map((t:any) => (
+                              <div key={t.leaderId} className={`p-4 border rounded-xl ${darkMode ? 'border-white/10 bg-black/20' : 'border-slate-200 bg-slate-50'}`}>
+                                  <div className="flex justify-between font-bold text-blue-500 mb-3 border-b border-black/5 dark:border-white/5 pb-2">
+                                      Lider: {t.leaderName} ({t.leaderClass}) - {t.leaderPhone} 
+                                      <button onClick={()=>removeTeamAdmin(viewAttendeesModal, t.leaderId)} className="text-red-500 text-xs hover:underline">Șterge Echipa</button>
+                                  </div>
+                                  {t.members?.map((m:any) => (
+                                      <div key={m.id} className="flex justify-between pl-4 text-sm opacity-80 mb-2">
+                                          <span>{m.name} ({m.class}) - {m.phone}</span>
+                                          <button onClick={()=>removeTeamMemberAdmin(viewAttendeesModal, t.leaderId, m.id)} className="text-red-500 text-[10px] font-bold hover:underline">Elimină</button>
+                                      </div>
+                                  ))}
+                              </div>
+                          ))
+                      ) : (
+                          viewAttendeesModal.attendees?.length === 0 ? <p className="opacity-50 italic">Niciun participant înscris momentan.</p> :
+                          viewAttendeesModal.attendees?.map((a:any) => (
+                              <div key={a.id} className={`flex justify-between items-center p-3 border rounded-xl ${darkMode ? 'border-white/10 bg-black/20' : 'border-slate-200 bg-slate-50'}`}>
+                                  <div><p className="font-bold">{a.name}</p><p className="text-xs opacity-60">{a.class} • {a.phone}</p></div>
+                                  <button onClick={()=>removeAttendeeAdmin(viewAttendeesModal, a.id)} className="text-red-500 text-xs font-bold hover:underline">Elimină</button>
+                              </div>
+                          ))
+                      )}
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* MODAL ISTORIC ELEVI */}
+      {viewUserHistory && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+              <div className={`w-full max-w-lg p-6 sm:p-8 rounded-[2.5rem] border shadow-2xl relative animate-popup ${cardBg}`}>
+                  <button onClick={() => setViewUserHistory(null)} className="absolute top-6 right-6 w-10 h-10 bg-black/10 dark:bg-white/10 rounded-full font-bold">✕</button>
+                  <h2 className="text-2xl font-black mb-6">Istoric: {viewUserHistory.name}</h2>
+                  <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                      {viewUserHistory.history?.length === 0 ? <p className="opacity-50 italic text-center py-10">Fără istoric de participare.</p> : viewUserHistory.history?.map((h:any, i:number) => (
+                          <div key={i} className={`p-4 border rounded-xl ${darkMode ? 'border-white/10 bg-black/20' : 'border-slate-200 bg-slate-50'}`}>
+                              <p className="font-bold text-sm mb-1">{h.eventTitle}</p>
+                              <div className="flex gap-2">
+                                  <span className="text-[10px] font-black uppercase text-blue-500 bg-blue-500/10 px-2 py-0.5 rounded">Rol: {h.role}</span>
+                                  <span className="text-[10px] font-mono opacity-50 border border-white/10 px-2 py-0.5 rounded">Data: {h.date}</span>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          </div>
+      )}
+
     </div>
   );
 }
