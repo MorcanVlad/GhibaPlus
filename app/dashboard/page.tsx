@@ -41,7 +41,11 @@ export default function Dashboard() {
   const [editLang, setEditLang] = useState("ro"); 
   const [currentLang, setCurrentLang] = useState("ro"); 
   const [darkMode, setDarkMode] = useState(true);
+  
+  // NOU: Logica pentru Tab-ul principal si Filtru
+  const [mainTab, setMainTab] = useState("anunturi"); // 'anunturi' sau 'evenimente'
   const [feedFilter, setFeedFilter] = useState("all"); 
+
   const [isTranslating, setIsTranslating] = useState(false);
 
   const [showContactAdmin, setShowContactAdmin] = useState(false);
@@ -123,16 +127,18 @@ export default function Dashboard() {
   useEffect(() => {
       if (!user) return;
       let allItems = [...news, ...events];
-      let feedItems = [...allItems].sort((a:any, b:any) => new Date(b.postedAt||b.date||0).getTime() - new Date(a.postedAt||a.date||0).getTime());
+      
+      // Feed-ul principal (fără vacanțe/examene care sunt doar informative)
+      let feedItems = [...allItems];
       setFeed(feedItems.filter(item => item.type !== 'holiday' && item.type !== 'exam'));
       
+      // Calendarul Sidebar (doar evenimentele la care ești înscris)
       let calItems = allItems.filter(item => item.col === 'calendar_events');
       const today = new Date(); today.setHours(0, 0, 0, 0);
       calItems = calItems.filter((item:any) => {
           const validDate = new Date(item.endDate || item.date) >= today;
           const validClass = !item.targetClasses || item.targetClasses.includes("Toată Școala") || item.targetClasses.includes(user.class);
           
-          // NOU: Filtrare pentru a afișa doar evenimentele la care ești înscris
           let isEnrolled = true;
           if (item.type === 'activity') {
               if (item.isTeamEvent) {
@@ -141,7 +147,6 @@ export default function Dashboard() {
                   isEnrolled = item.attendees?.some((a:any) => a.id === user.id) || false;
               }
           }
-
           return validDate && validClass && isEnrolled;
       });
       calItems.sort((a:any, b:any) => new Date(a.date||0).getTime() - new Date(b.date||0).getTime());
@@ -377,11 +382,20 @@ export default function Dashboard() {
 
   if (!user) return null;
 
-  const bgMain = darkMode ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-800";
+  // NOU: Background animat CSS
+  const bgMain = darkMode 
+    ? "bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-black to-slate-950 text-white" 
+    : "bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-red-100 via-white to-blue-100 text-slate-800";
+    
   const cardBg = darkMode ? "bg-slate-900/60 border-white/10 shadow-lg" : "bg-white border-slate-200/60 shadow-xl shadow-slate-200/50";
   const inputBg = darkMode ? "bg-black/50 border-white/10 text-white focus:bg-black/70" : "bg-slate-100 border-slate-300 text-slate-900 focus:bg-white";
 
+  // NOU: Logica de filtrare feed in functie de Tab-ul activ (Anunturi/Evenimente)
   const filteredFeed = translatedFeed.filter(item => {
+    // Verificam tab-ul activ
+    if (mainTab === "anunturi" && item.col !== "news") return false;
+    if (mainTab === "evenimente" && item.col !== "calendar_events") return false;
+
     const sq = searchQuery.toLowerCase();
     const targetTitle = item.translatedTitle || item.title || "";
     const targetContent = item.translatedContent || item.content || "";
@@ -390,15 +404,21 @@ export default function Dashboard() {
     if (feedFilter === "class") return matchesSearch && item.targetClasses?.includes(user.class);
     return matchesSearch && isForUserClass;
   });
+  // Sortam feed-ul final
+  filteredFeed.sort((a: any, b: any) => new Date(b.postedAt || b.date || 0).getTime() - new Date(a.postedAt || a.date || 0).getTime());
 
   return (
-    <div className={`min-h-screen relative transition-colors duration-500 ${bgMain}`}>
-      <style dangerouslySetInnerHTML={{__html: ` @keyframes popupEnter { 0% { transform: scale(0.95) translateY(15px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } } .animate-popup { animation: popupEnter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; } `}} />
+    <div className={`min-h-screen relative transition-colors duration-500 overflow-x-hidden ${bgMain}`}>
+      {/* NOU: CSS pentru background animat si popup */}
+      <style dangerouslySetInnerHTML={{__html: ` 
+        @keyframes popupEnter { 0% { transform: scale(0.95) translateY(15px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } } 
+        .animate-popup { animation: popupEnter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        
+        @keyframes gradMove { 0% { background-position: 0% 0%; } 50% { background-position: 100% 100%; } 100% { background-position: 0% 0%; } }
+        body { background-size: 200% 200%; animation: gradMove 15s ease infinite; }
+      `}} />
 
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className={`absolute -top-[10%] -left-[10%] w-[50%] h-[50%] rounded-full blur-[120px] ${darkMode ? 'bg-red-900/20' : 'bg-red-200/40'}`}></div>
-        <div className={`absolute -bottom-[10%] -right-[10%] w-[50%] h-[50%] rounded-full blur-[120px] ${darkMode ? 'bg-blue-900/20' : 'bg-blue-200/40'}`}></div>
-      </div>
+      {/* Vechiul z-0 blobs a fost sters pentru noul bg animat */}
 
       <nav className={`fixed top-0 w-full z-40 px-4 py-3 sm:py-4 backdrop-blur-2xl border-b flex justify-between items-center transition-all ${darkMode ? 'bg-slate-950/80 border-white/10' : 'bg-white/80 border-slate-200'}`}>
         <div className="max-w-6xl mx-auto w-full flex justify-between items-center gap-2">
@@ -436,6 +456,7 @@ export default function Dashboard() {
       <main className="max-w-6xl mx-auto p-4 pt-24 sm:pt-28 grid lg:grid-cols-3 gap-6 sm:gap-8 relative z-10">
         <div className="lg:col-span-2">
             
+          {/* AICI ESTE welcomeTitle PE CARE NU L-AI GASIT */}
           <div className={`p-6 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] border backdrop-blur-xl mb-6 shadow-sm ${cardBg}`}>
               <h2 className="text-2xl sm:text-3xl font-black mb-1 leading-tight">
                   {t.welcomeTitle} <span className="text-red-500">{user.name?.split(' ')[0]}</span> 👋
@@ -443,12 +464,28 @@ export default function Dashboard() {
               <p className="opacity-70 font-medium text-sm sm:text-base">{t.welcomeMsg}</p>
           </div>
 
+          {/* NOU: TOP NAVBAR PENTRU SECTIUNI (Anunturi, Evenimente, Forum) */}
+          <div className={`flex justify-between items-center p-2 rounded-2xl border backdrop-blur-xl mb-6 shadow-sm overflow-x-auto ${cardBg}`}>
+              <div className="flex gap-2">
+                  <button onClick={() => setMainTab("anunturi")} className={`px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-black rounded-xl transition-all duration-300 ${mainTab === 'anunturi' ? 'bg-red-500 text-white shadow-md' : 'opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}>📢 ANUNȚURI</button>
+                  <button onClick={() => setMainTab("evenimente")} className={`px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-black rounded-xl transition-all duration-300 ${mainTab === 'evenimente' ? 'bg-green-500 text-white shadow-md' : 'opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}>🎟️ EVENIMENTE</button>
+                  {/* Butonul Forum duce pe pagina dedicata */}
+                  <button onClick={() => router.push('/forum')} className={`px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-black rounded-xl transition-all duration-300 opacity-60 hover:opacity-100 hover:bg-blue-500/10 hover:text-blue-500`}>💬 FORUM</button>
+              </div>
+          </div>
+
+          {/* SUB-FILTRUL (Toata scoala / Clasa mea) APARE DOAR AICI, SUB NAVBAR */}
           <div className={`flex justify-between items-center p-1.5 rounded-2xl border backdrop-blur-xl w-fit mb-6 ${cardBg}`}>
-              <button onClick={() => setFeedFilter("all")} className={`px-4 sm:px-5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all duration-300 ${feedFilter === 'all' ? 'bg-red-500 text-white shadow-md' : 'opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}>{t.allSchool}</button>
-              <button onClick={() => setFeedFilter("class")} className={`px-4 sm:px-5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all duration-300 ${feedFilter === 'class' ? 'bg-red-500 text-white shadow-md' : 'opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}>{t.myClass}</button>
+              <button onClick={() => setFeedFilter("all")} className={`px-4 sm:px-5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all duration-300 ${feedFilter === 'all' ? (mainTab === 'evenimente' ? 'bg-green-500' : 'bg-red-500') + ' text-white shadow-md' : 'opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}>{t.allSchool}</button>
+              <button onClick={() => setFeedFilter("class")} className={`px-4 sm:px-5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all duration-300 ${feedFilter === 'class' ? (mainTab === 'evenimente' ? 'bg-green-500' : 'bg-red-500') + ' text-white shadow-md' : 'opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}>{t.myClass}</button>
           </div>
 
           <div className="space-y-6">
+              {filteredFeed.length === 0 && (
+                  <div className={`p-10 text-center rounded-2xl border ${cardBg} opacity-60 text-sm italic`}>
+                      Nicio postare momentan în secțiunea {mainTab === 'evenimente' ? 'Evenimente' : 'Anunțuri'}.
+                  </div>
+              )}
               {filteredFeed.map(item => {
                 const isRegistrationExpired = item.registrationDeadline && new Date(item.registrationDeadline).getTime() <= now.getTime();
                 const timerString = renderTimer(item.registrationDeadline);
@@ -458,12 +495,14 @@ export default function Dashboard() {
                   <div className="p-6 sm:p-8">
                     <div className="flex gap-4 sm:gap-5 items-start mb-5 sm:mb-6">
                       {item.type === 'activity' && item.date ? (
-                         <div className={`text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl flex flex-col items-center shadow-lg border bg-gradient-to-br from-red-500 to-rose-600 border-red-400/30 shrink-0 transform transition-transform group-hover:scale-105`}>
+                         <div className={`text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl flex flex-col items-center shadow-lg border bg-gradient-to-br from-green-500 to-emerald-600 border-green-400/30 shrink-0 transform transition-transform group-hover:scale-105`}>
                             <span className="text-xl sm:text-2xl font-black leading-none mb-1">{new Date(item.date).getDate()}</span>
                             <span className="text-[9px] sm:text-[10px] font-black uppercase">{new Date(item.date).toLocaleString(currentLang, {month:'short'})}</span>
                          </div>
                       ) : (
-                         <div className="w-12 h-12 sm:w-14 sm:h-14 shrink-0 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-2xl shadow-lg flex items-center justify-center border border-blue-400/30 font-black text-xl sm:text-2xl transform transition-transform group-hover:scale-105">📢</div>
+                         <div className={`w-12 h-12 sm:w-14 sm:h-14 shrink-0 bg-gradient-to-br ${mainTab === 'evenimente' ? 'from-green-500 to-emerald-600 border-green-400/30' : 'from-red-500 to-rose-600 border-red-400/30'} text-white rounded-2xl shadow-lg flex items-center justify-center border font-black text-xl sm:text-2xl transform transition-transform group-hover:scale-105`}>
+                             {item.col === 'calendar_events' ? '📅' : '📢'}
+                         </div>
                       )}
                       <div>
                         <h2 className="text-lg sm:text-2xl font-black mb-1 leading-tight">{item.translatedTitle || item.title}</h2>
@@ -474,8 +513,9 @@ export default function Dashboard() {
                     
                     <p className="line-clamp-3 opacity-80 mb-5 sm:mb-6 text-sm sm:text-base leading-relaxed">{item.translatedContent || item.content}</p>
                     
+                    {/* Logica linked post */}
                     {item.linkedPostId && (() => {
-                        const linkedPost = [...feed, ...calendarEvents].find(x => x.id === item.linkedPostId);
+                        const linkedPost = [...news, ...events].find(x => x.id === item.linkedPostId);
                         if(!linkedPost) return null;
                         return (
                             <div className={`mb-6 p-4 rounded-xl border border-blue-500/30 border-l-4 border-l-blue-500 transition-colors ${darkMode ? 'bg-blue-500/5 hover:bg-blue-500/10' : 'bg-blue-50 hover:bg-blue-100'}`} onClick={(e) => { e.stopPropagation(); setSelectedPost(linkedPost); }}>
@@ -486,6 +526,7 @@ export default function Dashboard() {
                         );
                     })()}
 
+                    {/* Timer Înscrieri */}
                     {item.type === 'activity' && timerString && !isRegistrationExpired && (
                         <div className="mb-6 flex items-center gap-3 p-3 sm:p-4 rounded-xl border bg-orange-500/10 border-orange-500/20 text-orange-500 shadow-inner">
                             <span className="text-lg">⏳</span>
@@ -496,6 +537,7 @@ export default function Dashboard() {
                         </div>
                     )}
 
+                    {/* Detalii Eveniment */}
                     {item.type === 'activity' && (
                         <div className={`mb-5 sm:mb-6 p-4 sm:p-5 rounded-xl sm:rounded-2xl border grid gap-3 sm:gap-4 grid-cols-2 ${darkMode ? 'bg-black/30 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
                             <div><span className="text-[9px] sm:text-[10px] font-black tracking-widest uppercase opacity-50 block mb-0.5 sm:mb-1">{t.dateTime}</span><span className="font-bold text-blue-500 text-xs sm:text-sm">{formatEventDateTime(item)}</span></div>
@@ -517,6 +559,7 @@ export default function Dashboard() {
                           </button>
                       </div>
                       
+                      {/* Butoane Acțiune Eveniment */}
                       {item.type === 'activity' && user?.class !== 'Absolvent' && !isRegistrationExpired && (
                         <button onClick={(e) => handleRegisterClick(e, item)} className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all shadow-md ${
                             (item.isTeamEvent ? item.teams?.some((t:any)=>t.leaderId===user.id || t.members?.some((m:any)=>m.id===user.id)) : item.attendees?.some((a:any)=>a.id===user.id)) 
@@ -543,13 +586,14 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Sidebar Calendar - Acum afiseaza doar evenimentele la care esti inscris */}
         <div className={`p-6 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] lg:sticky lg:top-28 border backdrop-blur-xl h-fit ${cardBg}`}>
             <h3 className="font-black text-lg sm:text-xl mb-5 sm:mb-6">{t.calendarTitle}</h3>
             <div className="space-y-3">
                 {translatedCalendar.length === 0 && <p className="opacity-50 text-xs sm:text-sm italic py-4">Nu ești înscris la niciun eveniment viitor.</p>}
                 {translatedCalendar.map(ev => (
                     <div key={ev.id} onClick={() => setSelectedPost(ev)} className={`cursor-pointer p-3 sm:p-4 rounded-xl sm:rounded-2xl border transition-all relative overflow-hidden transform hover:-translate-y-1 hover:shadow-md ${darkMode ? 'bg-white/5 border-white/5 hover:bg-white/10' : 'bg-slate-50 border-slate-200 hover:bg-white'}`}>
-                        <div className={`absolute left-0 top-0 bottom-0 w-1 sm:w-1.5 ${ev.type === 'holiday' ? 'bg-yellow-500' : (ev.type === 'exam' ? 'bg-purple-500' : 'bg-blue-500')}`}></div>
+                        <div className={`absolute left-0 top-0 bottom-0 w-1 sm:w-1.5 ${ev.type === 'holiday' ? 'bg-yellow-500' : (ev.type === 'exam' ? 'bg-purple-500' : 'bg-green-500')}`}></div>
                         <div className="font-bold text-xs sm:text-sm ml-2 sm:ml-3 line-clamp-1">{ev.translatedTitle || ev.title}</div>
                         <div className="text-[9px] sm:text-[10px] opacity-60 ml-2 sm:ml-3 mt-1 font-mono">{formatEventDateTime(ev)}</div>
                     </div>
@@ -820,9 +864,8 @@ export default function Dashboard() {
                 <h2 className="text-xl sm:text-3xl font-black mb-4 sm:mb-6 leading-tight">{selectedPost.translatedTitle || selectedPost.title}</h2>
                 <p className="text-sm sm:text-lg leading-relaxed opacity-90 whitespace-pre-wrap mb-6 sm:mb-8">{selectedPost.translatedContent || selectedPost.content}</p>
                 
-                {/* ETICHETĂ ȘI ÎN MODAL */}
                 {selectedPost.linkedPostId && (() => {
-                    const linkedPost = [...feed, ...calendarEvents].find(x => x.id === selectedPost.linkedPostId);
+                    const linkedPost = [...news, ...events].find(x => x.id === selectedPost.linkedPostId);
                     if(!linkedPost) return null;
                     return (
                         <div className={`mb-6 p-4 rounded-xl border border-blue-500/30 border-l-4 border-l-blue-500 transition-colors ${darkMode ? 'bg-blue-500/5' : 'bg-blue-50'}`}>
