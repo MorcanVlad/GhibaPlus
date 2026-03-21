@@ -418,6 +418,9 @@ export default function Forum() {
         body { background-size: 200% 200%; animation: gradMove 15s ease infinite; }
         .hide-scroll::-webkit-scrollbar { display: none; }
         .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        /* Adăugăm scroll ascuns pentru modale pe mobil */
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(156, 163, 175, 0.5); border-radius: 10px; }
       `}} />
 
       {/* NAVBAR */}
@@ -460,7 +463,6 @@ export default function Forum() {
           <div className={`flex justify-between items-center p-1.5 sm:p-2 rounded-2xl border backdrop-blur-xl mb-3 sm:mb-6 shadow-sm overflow-x-auto hide-scroll ${cardBg}`}>
               <div className="flex gap-1 sm:gap-2">
                   <button onClick={() => router.push('/dashboard')} className={`px-4 sm:px-6 py-2 sm:py-2.5 text-[11px] sm:text-sm font-black rounded-xl transition-all opacity-60 hover:opacity-100 hover:bg-red-500/10 hover:text-red-500 whitespace-nowrap`}>📢 ANUNȚURI</button>
-                  {/* Modificare NOUA: Aici trimitem parametru de tab cand dam click din forum */}
                   <button onClick={() => router.push('/dashboard?tab=events')} className={`px-4 sm:px-6 py-2 sm:py-2.5 text-[11px] sm:text-sm font-black rounded-xl transition-all opacity-60 hover:opacity-100 hover:bg-green-500/10 hover:text-green-500 whitespace-nowrap`}>🎟️ EVENIMENTE</button>
                   <button className={`px-4 sm:px-6 py-2 sm:py-2.5 text-[11px] sm:text-sm font-black rounded-xl transition-all bg-blue-500 text-white shadow-md whitespace-nowrap`}>💬 FORUM</button>
               </div>
@@ -693,31 +695,39 @@ export default function Forum() {
         </div>
       </main>
 
-      {/* MODAL CREARE POSTARE (Design Bottom-Sheet) */}
+      {/* MODAL CREARE POSTARE (Adaptat Mobile) */}
       {showCreateModal && (
-          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-              <div className={`w-full max-w-2xl h-[95vh] sm:h-auto sm:max-h-[90vh] p-5 pt-12 sm:p-8 rounded-t-[2rem] sm:rounded-[2.5rem] border shadow-2xl relative animate-popup overflow-y-auto ${cardBg}`}>
-                  <button onClick={() => setShowCreateModal(false)} className="absolute top-4 right-4 w-10 h-10 bg-black/10 dark:bg-white/10 rounded-full font-black text-lg hover:bg-red-500 hover:text-white hover:rotate-90 transition-all flex items-center justify-center z-50">✕</button>
-                  
-                  <div className="flex items-center gap-3 mb-6 relative z-10 pr-10">
-                      <UserAvatar uid={user.id} name={user.name} size="md" />
-                      <h2 className="text-xl sm:text-2xl font-black leading-tight">Deschide o discuție nouă</h2>
+          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md">
+              <div className={`w-full max-w-2xl h-fit max-h-[85vh] p-5 pt-6 sm:p-8 rounded-t-[2rem] sm:rounded-[2.5rem] border shadow-2xl relative animate-popup flex flex-col ${cardBg}`}>
+                  <div className="flex justify-between items-center mb-4 sm:mb-6 shrink-0">
+                      <div className="flex items-center gap-3">
+                          <UserAvatar uid={user.id} name={user.name} size="md" />
+                          <h2 className="text-xl sm:text-2xl font-black leading-tight">Discuție nouă</h2>
+                      </div>
+                      {/* Butonul X mutat aici, sigur pe ecran */}
+                      <button onClick={() => setShowCreateModal(false)} className="w-10 h-10 bg-black/10 dark:bg-white/10 rounded-full font-black text-lg hover:bg-red-500 hover:text-white hover:rotate-90 transition-all flex items-center justify-center shrink-0">✕</button>
                   </div>
                   
-                  <div className="flex flex-col sm:flex-row gap-3 mb-4 relative z-10">
-                      <select value={newPostCategory} onChange={e=>setNewPostCategory(e.target.value)} className={`w-full sm:w-1/3 p-4 rounded-2xl text-xs sm:text-sm font-bold outline-none border focus:border-blue-500 transition-colors cursor-pointer ${inputBg}`}>
-                          <option value="🗣️ Discuție Liberă" className="bg-white text-black">🗣️ Discuție Liberă</option>
-                          <option value="❓ Întrebare" className="bg-white text-black">❓ Întrebare</option>
-                          <option value="💡 Idee / Propunere" className="bg-white text-black">💡 Idee / Propunere</option>
-                          <option value="📚 Materiale / Temă" className="bg-white text-black">📚 Materiale / Temă</option>
-                          <option value="🚨 Problemă" className="bg-white text-black">🚨 Problemă</option>
-                      </select>
-                      <input placeholder="Titlul discuției..." value={newPostTitle} onChange={e=>setNewPostTitle(e.target.value)} className={`w-full sm:w-2/3 p-4 rounded-2xl text-xs sm:text-sm font-bold outline-none border focus:border-blue-500 transition-colors ${inputBg}`} />
+                  {/* Containerul scrollabil din interior */}
+                  <div className="overflow-y-auto custom-scrollbar pr-1 sm:pr-2 flex-1 space-y-4 sm:space-y-6">
+                      <div className="flex flex-col sm:flex-row gap-3">
+                          <select value={newPostCategory} onChange={e=>setNewPostCategory(e.target.value)} className={`w-full sm:w-1/3 p-4 rounded-2xl text-xs sm:text-sm font-bold outline-none border focus:border-blue-500 transition-colors cursor-pointer ${inputBg}`}>
+                              <option value="🗣️ Discuție Liberă" className="bg-white text-black">🗣️ Discuție Liberă</option>
+                              <option value="❓ Întrebare" className="bg-white text-black">❓ Întrebare</option>
+                              <option value="💡 Idee / Propunere" className="bg-white text-black">💡 Idee / Propunere</option>
+                              <option value="📚 Materiale / Temă" className="bg-white text-black">📚 Materiale / Temă</option>
+                              <option value="🚨 Problemă" className="bg-white text-black">🚨 Problemă</option>
+                          </select>
+                          <input placeholder="Titlul discuției..." value={newPostTitle} onChange={e=>setNewPostTitle(e.target.value)} className={`w-full sm:w-2/3 p-4 rounded-2xl text-xs sm:text-sm font-bold outline-none border focus:border-blue-500 transition-colors ${inputBg}`} />
+                      </div>
+
+                      <textarea placeholder="Descrie pe larg subiectul... Poți folosi #hashtag-uri!" value={newPostText} onChange={e=>setNewPostText(e.target.value)} className={`w-full p-4 rounded-2xl text-xs sm:text-sm outline-none border min-h-[160px] sm:min-h-[200px] resize-none focus:border-blue-500 transition-colors ${inputBg}`} />
+                      
+                      {newPostImage && <p className="text-[10px] sm:text-xs font-bold text-green-500">✅ Imagine atașată: {newPostImage.name}</p>}
                   </div>
 
-                  <textarea placeholder="Descrie pe larg subiectul... Poți folosi #hashtag-uri!" value={newPostText} onChange={e=>setNewPostText(e.target.value)} className={`w-full p-4 rounded-2xl text-xs sm:text-sm outline-none border h-40 sm:h-48 resize-none mb-6 focus:border-blue-500 transition-colors relative z-10 ${inputBg}`} />
-                  
-                  <div className="flex flex-col sm:flex-row justify-between items-center relative z-10 border-t pt-6 border-black/10 dark:border-white/10 gap-4">
+                  {/* Partea de jos (Butoanele) - Fixed la finalul popup-ului */}
+                  <div className="flex flex-col sm:flex-row justify-between items-center border-t pt-4 sm:pt-6 mt-4 border-black/10 dark:border-white/10 gap-3 shrink-0">
                       <label className="w-full sm:w-auto text-xs sm:text-sm font-bold opacity-60 hover:opacity-100 hover:text-blue-500 cursor-pointer transition flex items-center justify-center gap-2 bg-black/5 dark:bg-white/5 px-4 py-3 rounded-xl border border-transparent hover:border-blue-500/30">
                           📸 <span>Adaugă Imagine</span>
                           <input type="file" accept="image/*" className="hidden" onChange={(e)=>handleImageChange(e, setNewPostImage)} />
@@ -727,30 +737,30 @@ export default function Forum() {
                           {isUploading ? 'Se publică...' : (postCooldown > 0 ? `Așteaptă ${postCooldown}s` : 'Publică')}
                       </button>
                   </div>
-                  {newPostImage && <p className="text-[10px] sm:text-xs mt-4 font-bold text-green-500 text-center sm:text-left">✅ Imagine atașată: {newPostImage.name}</p>}
               </div>
           </div>
       )}
 
-      {/* ADMIN MODAL */}
+      {/* ADMIN MODAL (Adaptat Mobile) */}
       {adminUserModal && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-            <div className={`w-full max-w-2xl h-[90vh] sm:h-auto sm:max-h-[90vh] overflow-y-auto p-6 pt-10 sm:p-8 rounded-t-[2rem] sm:rounded-[2.5rem] border shadow-2xl relative animate-popup ${cardBg}`}>
-              <button onClick={() => setAdminUserModal(null)} className="absolute top-4 right-4 w-10 h-10 bg-black/10 dark:bg-white/10 rounded-full font-bold hover:rotate-90 transition-transform flex items-center justify-center z-50">✕</button>
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md">
+            <div className={`w-full max-w-2xl h-fit max-h-[85vh] p-5 pt-6 sm:p-8 rounded-t-[2rem] sm:rounded-[2.5rem] border shadow-2xl relative animate-popup flex flex-col ${cardBg}`}>
               
-              <div className="flex items-center gap-4 mb-6 border-b border-black/10 dark:border-white/10 pb-6 pr-8">
-                  <UserAvatar uid={adminUserModal.id} name={adminUserModal.name} size="lg" />
-                  <div className="min-w-0">
-                      <h2 className="text-lg sm:text-2xl font-black text-red-500 truncate">{adminUserModal.name}</h2>
-                      <p className="text-[10px] font-mono opacity-60 mt-0.5 truncate">ID: {adminUserModal.id}</p>
-                      <div className="flex flex-wrap gap-2 mt-2.5 text-[10px] font-bold bg-black/5 dark:bg-white/5 p-2 rounded-lg inline-flex max-w-full">
-                          <span className="truncate">📧 {adminUserModal.email}</span>
-                          <span className="truncate">🏫 <span className="font-mono">{adminUserModal.class}</span></span>
+              <div className="flex justify-between items-start mb-4 border-b border-black/10 dark:border-white/10 pb-4 shrink-0 gap-4">
+                  <div className="flex items-center gap-4 min-w-0">
+                      <UserAvatar uid={adminUserModal.id} name={adminUserModal.name} size="md" />
+                      <div className="min-w-0">
+                          <h2 className="text-lg sm:text-2xl font-black text-red-500 truncate">{adminUserModal.name}</h2>
+                          <div className="flex flex-wrap gap-1 mt-1 text-[9px] sm:text-[10px] font-bold">
+                              <span className="truncate bg-black/5 dark:bg-white/5 p-1 px-2 rounded-md">📧 {adminUserModal.email}</span>
+                              <span className="truncate bg-black/5 dark:bg-white/5 p-1 px-2 rounded-md">🏫 {adminUserModal.class}</span>
+                          </div>
                       </div>
                   </div>
+                  <button onClick={() => setAdminUserModal(null)} className="w-10 h-10 bg-black/10 dark:bg-white/10 rounded-full font-bold hover:rotate-90 transition-transform flex items-center justify-center shrink-0">✕</button>
               </div>
 
-              <div className="mb-6">
+              <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 mb-4">
                   <div className={`p-4 sm:p-5 rounded-2xl border ${darkMode ? 'bg-black/40 border-white/5' : 'bg-slate-50 border-slate-100'}`}>
                       <div className="flex justify-between items-center mb-3">
                           <h3 className="font-black text-sm text-blue-500">💬 Postări ({adminUserForumPosts.length})</h3>
@@ -758,7 +768,7 @@ export default function Forum() {
                               <button onClick={handleMassDelete} className="bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded-xl text-[10px] font-black transition-all border border-red-500/20">🗑️ Șterge Tot</button>
                           )}
                       </div>
-                      <div className="space-y-3 max-h-48 sm:max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                      <div className="space-y-3">
                           {adminUserForumPosts.length === 0 && <p className="opacity-50 text-xs italic">Nicio postare.</p>}
                           {adminUserForumPosts.map(p => (
                               <div key={p.id} className={`p-3 bg-black/5 dark:bg-white/5 rounded-xl border ${darkMode?'border-white/5':'border-slate-100'}`}>
@@ -773,7 +783,7 @@ export default function Forum() {
                   </div>
               </div>
 
-              <div className="grid sm:grid-cols-2 gap-3 pt-4 border-t border-black/10 dark:border-white/10">
+              <div className="grid sm:grid-cols-2 gap-3 pt-4 border-t border-black/10 dark:border-white/10 shrink-0">
                   <button onClick={handleResetPassword} className="py-3.5 bg-orange-500/10 text-orange-500 border border-orange-500/20 rounded-xl font-black text-xs sm:text-sm hover:bg-orange-500 hover:text-white transition">🔑 Resetare Parolă</button>
                   <button onClick={handleDeleteUser} className="py-3.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl font-black text-xs sm:text-sm hover:bg-red-500 hover:text-white transition">🗑️ Șterge Cont</button>
               </div>
@@ -781,13 +791,17 @@ export default function Forum() {
           </div>
       )}
 
-      {/* SETARI MODAL */}
+      {/* SETARI MODAL (Adaptat Mobile) */}
       {showSettings && !showContactAdmin && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-          <div className={`w-full max-w-lg h-[80vh] sm:h-auto sm:max-h-[90vh] overflow-y-auto p-6 pt-10 sm:p-10 rounded-t-[2rem] sm:rounded-[2.5rem] border shadow-2xl relative animate-popup ${cardBg}`}>
-            <button onClick={() => setShowSettings(false)} className="absolute top-4 right-4 w-10 h-10 bg-black/10 dark:bg-white/10 rounded-full font-bold hover:rotate-90 transition-transform flex items-center justify-center z-50">✕</button>
-            <h2 className="text-xl sm:text-2xl font-black mb-8 flex items-center gap-2">⚙️ Setări Ghiba+</h2>
-            <div className="space-y-5">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md">
+          <div className={`w-full max-w-lg h-fit max-h-[85vh] p-5 pt-6 sm:p-10 rounded-t-[2rem] sm:rounded-[2.5rem] border shadow-2xl relative animate-popup flex flex-col ${cardBg}`}>
+            
+            <div className="flex justify-between items-center mb-6 shrink-0">
+                <h2 className="text-xl sm:text-2xl font-black flex items-center gap-2">⚙️ Setări Ghiba+</h2>
+                <button onClick={() => setShowSettings(false)} className="w-10 h-10 bg-black/10 dark:bg-white/10 rounded-full font-bold hover:rotate-90 transition-transform flex items-center justify-center">✕</button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-5">
                 <div>
                     <label className="text-[10px] font-black tracking-widest uppercase opacity-50 mb-2 block">Clasa Ta</label>
                     <input value={user.class} disabled className={`w-full p-4 rounded-2xl text-sm font-bold border font-mono opacity-50 ${darkMode ? 'bg-black/50 border-white/10' : 'bg-slate-100 border-slate-300'}`} />
@@ -808,13 +822,17 @@ export default function Forum() {
         </div>
       )}
 
-      {/* NOTIFICARI MODAL */}
+      {/* NOTIFICARI MODAL (Adaptat Mobile) */}
       {showNotif && (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-          <div className={`w-full max-w-md h-[80vh] sm:h-auto sm:max-h-[90vh] overflow-y-auto p-6 pt-10 sm:p-8 rounded-t-[2rem] sm:rounded-[2.5rem] border shadow-2xl relative animate-popup ${cardBg}`}>
-            <button onClick={() => setShowNotif(false)} className="absolute top-4 right-4 w-10 h-10 bg-black/10 dark:bg-white/10 rounded-full font-bold hover:rotate-90 transition-transform flex items-center justify-center z-50">✕</button>
-            <h2 className="text-xl font-black mb-6 flex items-center gap-2">🔔 Notificări G+</h2>
-            <div className="space-y-3 max-h-[60vh] sm:max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md">
+          <div className={`w-full max-w-md h-fit max-h-[85vh] p-5 pt-6 sm:p-8 rounded-t-[2rem] sm:rounded-[2.5rem] border shadow-2xl relative animate-popup flex flex-col ${cardBg}`}>
+            
+            <div className="flex justify-between items-center mb-6 shrink-0">
+                <h2 className="text-xl font-black flex items-center gap-2">🔔 Notificări G+</h2>
+                <button onClick={() => setShowNotif(false)} className="w-10 h-10 bg-black/10 dark:bg-white/10 rounded-full font-bold hover:rotate-90 transition-transform flex items-center justify-center">✕</button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-3">
               {notifications.length === 0 && <p className="opacity-50 text-xs italic text-center py-10">Nicio notificare momentan.</p>}
               {notifications.map(n => (
                   <div key={n.id} className={`p-4 rounded-2xl border flex justify-between items-start gap-4 ${darkMode ? 'bg-white/5 border-white/5' : 'bg-slate-100 border-slate-200'}`}>
@@ -831,13 +849,17 @@ export default function Forum() {
         </div>
       )}
 
-      {/* CONTACT ADMIN MODAL */}
+      {/* CONTACT ADMIN MODAL (Adaptat Mobile) */}
       {showContactAdmin && (
-          <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-            <div className={`w-full max-w-lg h-[90vh] sm:h-auto sm:max-h-[90vh] overflow-y-auto p-6 pt-10 sm:p-10 rounded-t-[2rem] sm:rounded-[2.5rem] border shadow-2xl relative animate-popup ${cardBg}`}>
-              <button onClick={() => setShowContactAdmin(false)} className="absolute top-4 right-4 w-10 h-10 bg-black/10 dark:bg-white/10 rounded-full font-bold transition-transform flex items-center justify-center z-50">✕</button>
-              <h2 className="text-xl sm:text-2xl font-black mb-6 text-blue-500 pr-8">📧 Contact Administrator</h2>
-              <div className="space-y-5">
+          <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md">
+            <div className={`w-full max-w-lg h-fit max-h-[85vh] p-5 pt-6 sm:p-10 rounded-t-[2rem] sm:rounded-[2.5rem] border shadow-2xl relative animate-popup flex flex-col ${cardBg}`}>
+              
+              <div className="flex justify-between items-center mb-6 shrink-0">
+                  <h2 className="text-xl sm:text-2xl font-black text-blue-500">📧 Contact Admin</h2>
+                  <button onClick={() => setShowContactAdmin(false)} className="w-10 h-10 bg-black/10 dark:bg-white/10 rounded-full font-bold transition-transform flex items-center justify-center">✕</button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-5">
                   <div>
                       <label className="text-[10px] font-black tracking-widest uppercase opacity-50 mb-2 block">Motivul Mesajului</label>
                       <select value={contactReason} onChange={e=>setContactReason(e.target.value)} className={`w-full p-4 rounded-2xl text-sm font-bold outline-none border focus:border-blue-500 transition-colors cursor-pointer ${darkMode ? 'bg-black/50 border-white/10' : 'bg-slate-100 border-slate-300'}`}>
