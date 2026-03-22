@@ -9,7 +9,7 @@ import { SCHOOL_CLASSES } from "./lib/constants";
 const TRANSLATIONS: any = {
   ro: { 
       portal: "Portalul Elevilor", emailPlace: "Nume.Prenume@ghibabirta.ro", phonePlace: "Telefon", classPlace: "Clasa", passPlace: "Parolă", confirmPlace: "Confirmă Parola", accept1: "Accept ", termsBtn: "Politica de Confidențialitate (GDPR)", accept2: " și Termenii.", btnRegister: "Creează Contul", btnLogin: "Intră în Cont", switchLogin: "Ai deja cont? Autentifică-te.", switchRegister: "Nou aici? Solicită un cont.", errEmail: "Folosește emailul școlii (@ghibabirta.ro).", errClass: "Alege-ți clasa!", errTerms: "Trebuie să accepți Termenii și Condițiile.", errPassMatch: "Parolele nu coincid!", errPhone: "Numărul de telefon trebuie să aibă 10 cifre!", errWhitelist: "⛔ Cont neaprobat.", errCreds: "Parolă sau email incorect.", errInUse: "Acest cont a fost deja creat.", errTooMany: "🔒 Ai încercat de prea multe ori. Așteaptă 5 minute.", classWarning: "⚠️ Atenție: Clasa nu mai poate fi modificată ulterior!", tTitle: "📄 Termeni, Condiții și Politica de Confidențialitate (GDPR)", tBtn: "Am înțeles și Accept", 
-      tc1: "1. Introducere și Scopul Platformei: Platforma GhibaPlus a fost dezvoltată inițial în cadrul unui proiect Erasmus+ desfășurat în Portugalia. Aceasta este o inițiativă independentă a elevilor pentru a facilita accesul la informații școlare, evenimente și noutăți. Deși nu este un canal administrativ oficial al instituției, platforma funcționează respectând cele mai înalte standarde de etică și siguranță digitală.", 
+      tc1: "1. Introducere și Scopul Platformei: Platforma GhibaPlus a fost dezvoltată inițial în cadrul unui proiect Erasmus+ desfășurat în Portugalia. Aceasta este o inițiativă independentă a elevilor pentru a facilita accesul la informații școlare, events și noutăți. Deși nu este un canal administrativ oficial al instituției, platforma funcționează respectând cele mai înalte standarde de etică și siguranță digitală.", 
       tc2: "2. Conformitatea cu Legislația UE (GDPR): Ne luăm în serios responsabilitatea privind protecția datelor. Prelucrarea datelor cu caracter personal se face în conformitate cu Regulamentul (UE) 2016/679 (GDPR). Colectăm doar datele strict necesare (nume, prenume, clasă, email școlar și număr de telefon) exclusiv pentru crearea contului, validarea identității și comunicarea legată de evenimentele școlare. Nu folosim cookie-uri de tracking în scopuri comerciale.", 
       tc3: "3. Securitatea și Stocarea Datelor: Informațiile dumneavoastră sunt criptate și stocate securizat pe serverele cloud Google Firebase, care respectă standardele internaționale de securitate (ISO 27001, SOC 1, SOC 2, SOC 3). Accesul la baza de date este strict restricționat și monitorizat. Nu vindem, nu închiriem și nu transferăm datele dumneavoastră către terțe părți sub nicio formă.", 
       tc4: "4. Drepturile Utilizatorului: Conform legislației europene, beneficiați de dreptul la informare, dreptul de acces la date, dreptul la rectificare, dreptul la ștergerea datelor („dreptul de a fi uitat”), dreptul la restricționarea prelucrării și dreptul la portabilitatea datelor. Vă puteți revoca acordul și solicita ștergerea definitivă a contului în orice moment, adresându-vă administratorilor platformei.", 
@@ -32,6 +32,11 @@ export default function Login() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  
+  // State-uri noi pentru vizibilitatea parolei
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const router = useRouter();
@@ -146,7 +151,29 @@ export default function Login() {
                 </div>
             )}
             
-            <input type="password" placeholder={t.passPlace} value={password} onChange={e => setPassword(e.target.value)} className={inputClass} required />
+            {/* Input Parolă cu Buton de Afișare */}
+            <div className="relative">
+                <input 
+                    type={showPassword ? "text" : "password"} 
+                    placeholder={t.passPlace} 
+                    value={password} 
+                    onChange={e => setPassword(e.target.value)} 
+                    className={`${inputClass} pr-12`} 
+                    required 
+                />
+                <button 
+                    type="button" 
+                    onClick={() => setShowPassword(!showPassword)} 
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors focus:outline-none"
+                    aria-label={showPassword ? "Ascunde parola" : "Afișează parola"}
+                >
+                    {showPassword ? (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                    ) : (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                    )}
+                </button>
+            </div>
             
             {!isRegistering && (
                 <div className="flex justify-end">
@@ -158,7 +185,30 @@ export default function Login() {
 
             {isRegistering && (
                 <div className="space-y-4 animate-popup">
-                    <input type="password" placeholder={t.confirmPlace} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className={inputClass} required />
+                    {/* Input Confirmă Parola cu Buton de Afișare */}
+                    <div className="relative">
+                        <input 
+                            type={showConfirmPassword ? "text" : "password"} 
+                            placeholder={t.confirmPlace} 
+                            value={confirmPassword} 
+                            onChange={e => setConfirmPassword(e.target.value)} 
+                            className={`${inputClass} pr-12`} 
+                            required 
+                        />
+                        <button 
+                            type="button" 
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)} 
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors focus:outline-none"
+                            aria-label={showConfirmPassword ? "Ascunde parola" : "Afișează parola"}
+                        >
+                            {showConfirmPassword ? (
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                            ) : (
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                            )}
+                        </button>
+                    </div>
+
                     <div className="flex items-start sm:items-center gap-3 p-4 rounded-2xl bg-black/40 border border-white/10">
                         <input type="checkbox" id="terms" checked={acceptedTerms} onChange={e => setAcceptedTerms(e.target.checked)} className="w-5 h-5 mt-0.5 sm:mt-0 accent-red-500 cursor-pointer rounded-md shrink-0" />
                         <label htmlFor="terms" className="text-[10px] sm:text-xs leading-relaxed text-gray-300 font-medium">
