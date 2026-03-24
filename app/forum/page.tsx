@@ -83,6 +83,11 @@ export default function Forum() {
 
   const [replyTexts, setReplyTexts] = useState<{[key: string]: string}>({});
   const [replyImages, setReplyImages] = useState<{[key: string]: File | null}>({});
+  
+  const [visibleReplies, setVisibleReplies] = useState<{[key: string]: number}>({});
+  const [replyingTo, setReplyingTo] = useState<{[postId: string]: { userId: string, userName: string } | null}>({});
+  
+  const [openPopupId, setOpenPopupId] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("new"); 
@@ -158,7 +163,8 @@ export default function Forum() {
       const safeText = censorText(newPostText);
       const postTags = extractTags(safeText);
 
-      await addDoc(collection(db, "forum_posts"), {
+      // Salvăm postarea nouă ca să îi preluăm ID-ul pentru notificări
+      const newPostRef = await addDoc(collection(db, "forum_posts"), {
           title: censorText(newPostTitle), text: safeText, category: newPostCategory, tags: postTags, imageUrl, 
           authorId: user.id, authorName: user.name, authorRole: user.role,
           createdAt: new Date().toISOString(), likes: [], replies: [], locked: false, pinned: false
@@ -170,6 +176,7 @@ export default function Forum() {
           await addDoc(collection(db, "users", followerId, "notifications"), {
               title: `📢 ${user.name} a postat ceva nou!`,
               message: censorText(newPostTitle),
+              postId: newPostRef.id,
               sentAt: new Date().toISOString(),
               read: false
           });
@@ -180,10 +187,27 @@ export default function Forum() {
       setPostCooldown(15); 
   };
 
+  const handleReplyUpvote = async (postId: string, reply: any) => {
+      const post = forumPosts.find(p => p.id === postId);
+      if (!post) return;
+      
+      const isLiked = reply.likes?.includes(user.id);
+      const updatedReplies = post.replies.map((r: any) => {
+          if (r.id === reply.id) {
+              const newLikes = isLiked 
+                  ? (r.likes || []).filter((id: string) => id !== user.id)
+                  : [...(r.likes || []), user.id];
+              return { ...r, likes: newLikes };
+          }
+          return r;
+      });
+      await updateDoc(doc(db, "forum_posts", postId), { replies: updatedReplies });
+  };
+
   const handleReply = async (postId: string) => {
-      const text = replyTexts[postId];
+      const currentText = replyTexts[postId];
       const imageFile = replyImages[postId];
-      if((!text || !text.trim()) && !imageFile) return;
+      if((!currentText || !currentText.trim()) && !imageFile) return;
       
       setIsUploading(true);
       let replyImageUrl = "";
@@ -191,16 +215,51 @@ export default function Forum() {
           replyImageUrl = await uploadImageToStorage(imageFile, "forum_replies");
       }
 
+      const currentReplyTarget = replyingTo[postId];
+      let finalMessage = currentText || "";
+      if (currentReplyTarget) {
+          finalMessage = `@${currentReplyTarget.userName} ` + finalMessage;
+      }
+
       const newReply = { 
           id: Date.now().toString(), 
-          text: censorText(text || ""), 
+          text: censorText(finalMessage), 
           imageUrl: replyImageUrl,
           authorId: user.id, authorName: user.name, authorRole: user.role, 
-          createdAt: new Date().toISOString() 
+          createdAt: new Date().toISOString(),
+          likes: [] 
       };
+      
       await updateDoc(doc(db, "forum_posts", postId), { replies: arrayUnion(newReply) });
+
+      const post = forumPosts.find(p => p.id === postId);
+      
+      // Notificare pentru cine a primit tag
+      if (currentReplyTarget && currentReplyTarget.userId !== user.id) {
+          await addDoc(collection(db, "users", currentReplyTarget.userId, "notifications"), {
+              title: `💬 ${user.name} te-a menționat într-un comentariu!`,
+              message: censorText(currentText || ""),
+              postId: postId,
+              sentAt: new Date().toISOString(),
+              read: false
+          });
+      } 
+      // Notificare pentru autorul postării
+      if (post && post.authorId !== user.id && (!currentReplyTarget || currentReplyTarget.userId !== post.authorId)) {
+          await addDoc(collection(db, "users", post.authorId, "notifications"), {
+              title: `💬 ${user.name} a adăugat un răspuns la discuția ta!`,
+              message: censorText(currentText || ""),
+              postId: postId,
+              sentAt: new Date().toISOString(),
+              read: false
+          });
+      }
+
       setReplyTexts(prev => ({...prev, [postId]: ""}));
       setReplyImages(prev => ({...prev, [postId]: null}));
+      setReplyingTo(prev => ({...prev, [postId]: null})); 
+      
+      setVisibleReplies(prev => ({...prev, [postId]: (prev[postId] || 1) + 1}));
       setIsUploading(false);
   };
 
@@ -217,9 +276,12 @@ export default function Forum() {
       await deleteDoc(doc(db, "forum_posts", postId));
   };
 
-  const deleteReply = async (postId: string, reply: any) => {
+  const deleteReply = async (postId: string, replyId: string) => {
       if(!confirm("Ștergi acest răspuns?")) return;
-      await updateDoc(doc(db, "forum_posts", postId), { replies: arrayRemove(reply) });
+      const post = forumPosts.find(p => p.id === postId);
+      if (!post) return;
+      const updatedReplies = post.replies.filter((r:any) => r.id !== replyId);
+      await updateDoc(doc(db, "forum_posts", postId), { replies: updatedReplies });
   };
 
   const handleMassDelete = async () => {
@@ -286,6 +348,24 @@ export default function Forum() {
   
   const handleDeleteNotif = async (notifId: string) => { await deleteDoc(doc(db, "users", user.id, "notifications", notifId)); };
   
+  // NOU: Navigare și focusare pe postarea specifică la click pe notificare
+  const handleNotifClick = async (n: any) => {
+      setShowNotif(false);
+      if (n.postId) {
+          setSearchQuery(""); // Resetăm căutările pt a găsi sigur postarea
+          setSortBy("new");
+          
+          setTimeout(() => {
+              const el = document.getElementById(`post-${n.postId}`);
+              if (el) {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  el.classList.add('ring-4', 'ring-blue-500', 'transition-all', 'duration-500');
+                  setTimeout(() => el.classList.remove('ring-4', 'ring-blue-500'), 2500);
+              }
+          }, 300); // Lăsăm puțin timp pt render
+      }
+  };
+
   const handleSaveSettings = async () => {
       if (editPhone.length !== 10 && editPhone.length > 0) return alert("Numărul de telefon trebuie să aibă 10 cifre!");
       await updateDoc(doc(db, "users", user.id), { phone: editPhone });
@@ -317,15 +397,19 @@ export default function Forum() {
       return { data: uData, postsCount: uPostsCount, repliesCount: uRepliesCount, totalUpvotes: uUpvotes, score: uScore, rank: uRank, isFollowing: amIFollowing };
   };
 
-  const renderUserInfoWithHover = (userId: string, postAuthorId: string, customNameFallback: string, isSmallContext = false) => {
+  const renderUserInfoWithClick = (userId: string, postAuthorId: string, customNameFallback: string, uniqueId: string, isSmallContext = false) => {
       const stats = getUserStats(userId);
       const name = stats.data.name !== 'Necunoscut' ? stats.data.name : customNameFallback;
       const isOp = userId === postAuthorId;
       const isAdmin = stats.data.role === 'admin';
+      const isOpen = openPopupId === uniqueId;
 
       return (
-          <div className="relative group min-w-0 flex-1 cursor-default">
-              <div className="flex items-center gap-1.5 flex-wrap w-fit">
+          <div className="relative min-w-0 flex-1">
+              <div 
+                  className="flex items-center gap-1.5 flex-wrap w-fit cursor-pointer select-none transition-opacity hover:opacity-80"
+                  onClick={(e) => { e.stopPropagation(); setOpenPopupId(isOpen ? null : uniqueId); }}
+              >
                   <p className={`font-black leading-tight truncate ${isSmallContext ? 'text-[11px] sm:text-xs max-w-[120px] sm:max-w-[150px]' : 'text-sm sm:text-base max-w-[140px] sm:max-w-[200px]'} ${isAdmin ? 'text-red-500' : (isSmallContext ? 'text-blue-500' : '')}`}>
                       {name}
                   </p>
@@ -334,43 +418,49 @@ export default function Forum() {
                   {isSmallContext && isAdmin && <span className="text-[7px] sm:text-[8px] bg-red-500/20 text-red-500 px-1 py-0.5 rounded font-black border border-red-500/30">ADM</span>}
               </div>
               
-              <div className="absolute top-full left-0 pt-2 z-[60] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                  <div className={`w-64 sm:w-72 p-4 rounded-3xl border shadow-2xl text-xs ${darkMode ? 'bg-slate-800 border-white/10' : 'bg-white border-slate-200'}`}>
-                      <div className="flex justify-between items-start mb-2 gap-2">
-                          <div className="min-w-0 flex-1">
-                              <p className={`font-black text-sm truncate ${isAdmin ? 'text-red-500' : 'text-blue-500'}`}>{name}</p>
-                              <span className={`text-[9px] px-2 py-0.5 mt-1 rounded font-black uppercase inline-block border ${stats.rank.style}`}>{stats.rank.label}</span>
+              {isOpen && (
+                  <>
+                      {/* Fundal invizibil care închide popup-ul când dai click oriunde altundeva */}
+                      <div className="fixed inset-0 z-[55]" onClick={(e) => { e.stopPropagation(); setOpenPopupId(null); }}></div>
+                      
+                      {/* Fereastra Popup */}
+                      <div className={`absolute top-full left-0 mt-2 z-[60] animate-popup w-64 sm:w-72 p-4 rounded-3xl border shadow-2xl text-xs ${darkMode ? 'bg-slate-800 border-white/10' : 'bg-white border-slate-200'}`} onClick={(e) => e.stopPropagation()}>
+                          <div className="flex justify-between items-start mb-2 gap-2">
+                              <div className="min-w-0 flex-1">
+                                  <p className={`font-black text-sm truncate ${isAdmin ? 'text-red-500' : 'text-blue-500'}`}>{name}</p>
+                                  <span className={`text-[9px] px-2 py-0.5 mt-1 rounded font-black uppercase inline-block border ${stats.rank.style}`}>{stats.rank.label}</span>
+                              </div>
+                              {user.id !== userId && (
+                                  <button onClick={(e) => { e.stopPropagation(); toggleFollow(userId); }} className={`shrink-0 px-3 py-1.5 rounded-xl font-black text-[10px] transition-all shadow-sm ${stats.isFollowing ? 'bg-black/10 dark:bg-white/10 opacity-70 hover:bg-red-500 hover:text-white' : 'bg-blue-600 text-white hover:bg-blue-500'}`}>
+                                      {stats.isFollowing ? 'Urmărești' : 'Urmărește'}
+                                 </button>
+                              )}
                           </div>
-                          {user.id !== userId && (
-                              <button onClick={(e) => { e.stopPropagation(); toggleFollow(userId); }} className={`shrink-0 px-3 py-1.5 rounded-xl font-black text-[10px] transition-all shadow-sm ${stats.isFollowing ? 'bg-black/10 dark:bg-white/10 opacity-70 hover:bg-red-500 hover:text-white' : 'bg-blue-600 text-white hover:bg-blue-500'}`}>
-                                  {stats.isFollowing ? 'Urmărești' : 'Urmărește'}
+                          
+                          <div className="grid grid-cols-3 gap-1 mt-3 pt-3 border-t border-black/10 dark:border-white/10">
+                              <div className={`bg-black/5 dark:bg-white/5 p-2 rounded-lg text-center border ${darkMode?'border-white/5':'border-slate-100'}`}>
+                                  <p className="text-[8px] sm:text-[9px] opacity-60 font-bold uppercase">Postări</p>
+                                  <p className="font-black text-blue-500 text-xs sm:text-sm">{stats.postsCount}</p>
+                              </div>
+                              <div className={`bg-black/5 dark:bg-white/5 p-2 rounded-lg text-center border ${darkMode?'border-white/5':'border-slate-100'}`}>
+                                  <p className="text-[8px] sm:text-[9px] opacity-60 font-bold uppercase">Răspunsuri</p>
+                                  <p className="font-black text-teal-500 text-xs sm:text-sm">{stats.repliesCount}</p>
+                              </div>
+                              <div className={`bg-black/5 dark:bg-white/5 p-2 rounded-lg text-center border ${darkMode?'border-white/5':'border-slate-100'}`}>
+                                  <p className="text-[8px] sm:text-[9px] opacity-60 font-bold uppercase">Urmăritori</p>
+                                  <p className="font-black text-orange-500 text-xs sm:text-sm">{stats.data.followers?.length || 0}</p>
+                              </div>
+                          </div>
+                          <p className="mt-3 opacity-60 text-[10px] text-center">Clasa: <span className="font-mono font-black">{stats.data.class}</span></p>
+                          
+                          {user.role === 'admin' && (
+                              <button onClick={(e) => { e.stopPropagation(); openAdminUserModal(userId); setOpenPopupId(null); }} className="mt-3 w-full py-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-[10px] font-black hover:bg-red-500 hover:text-white transition">
+                                  ⚙️ Administrare Utilizator
                               </button>
                           )}
                       </div>
-                      
-                      <div className="grid grid-cols-3 gap-1 mt-3 pt-3 border-t border-black/10 dark:border-white/10">
-                          <div className={`bg-black/5 dark:bg-white/5 p-2 rounded-lg text-center border ${darkMode?'border-white/5':'border-slate-100'}`}>
-                              <p className="text-[8px] sm:text-[9px] opacity-60 font-bold uppercase">Postări</p>
-                              <p className="font-black text-blue-500 text-xs sm:text-sm">{stats.postsCount}</p>
-                          </div>
-                          <div className={`bg-black/5 dark:bg-white/5 p-2 rounded-lg text-center border ${darkMode?'border-white/5':'border-slate-100'}`}>
-                              <p className="text-[8px] sm:text-[9px] opacity-60 font-bold uppercase">Răspunsuri</p>
-                              <p className="font-black text-teal-500 text-xs sm:text-sm">{stats.repliesCount}</p>
-                          </div>
-                          <div className={`bg-black/5 dark:bg-white/5 p-2 rounded-lg text-center border ${darkMode?'border-white/5':'border-slate-100'}`}>
-                              <p className="text-[8px] sm:text-[9px] opacity-60 font-bold uppercase">Urmăritori</p>
-                              <p className="font-black text-orange-500 text-xs sm:text-sm">{stats.data.followers?.length || 0}</p>
-                          </div>
-                      </div>
-                      <p className="mt-3 opacity-60 text-[10px] text-center">Clasa: <span className="font-mono font-black">{stats.data.class}</span></p>
-                      
-                      {user.role === 'admin' && (
-                          <button onClick={(e) => { e.stopPropagation(); openAdminUserModal(userId); }} className="mt-3 w-full py-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-[10px] font-black hover:bg-red-500 hover:text-white transition">
-                              ⚙️ Administrare Utilizator
-                          </button>
-                      )}
-                  </div>
-              </div>
+                  </>
+              )}
           </div>
       );
   };
@@ -418,7 +508,6 @@ export default function Forum() {
         body { background-size: 200% 200%; animation: gradMove 15s ease infinite; }
         .hide-scroll::-webkit-scrollbar { display: none; }
         .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
-        /* Adăugăm scroll ascuns pentru modale pe mobil */
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(156, 163, 175, 0.5); border-radius: 10px; }
       `}} />
@@ -502,11 +591,20 @@ export default function Forum() {
                   const canLock = user.role === 'admin' || user.id === post.authorId;
                   const isSaved = savedThreads.includes(post.id);
 
+                  const sortedReplies = [...(post.replies || [])].sort((a, b) => {
+                      const likesA = a.likes?.length || 0;
+                      const likesB = b.likes?.length || 0;
+                      if (likesB !== likesA) return likesB - likesA;
+                      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+                  });
+
+                  const currentLimit = visibleReplies[post.id] || 1;
+                  const visibleRepliesList = sortedReplies.slice(0, currentLimit);
+
                   return (
-                  <div key={post.id} className={`rounded-3xl sm:rounded-[2rem] border backdrop-blur-xl overflow-hidden shadow-sm flex flex-col sm:flex-row ${cardBg} ${post.locked ? 'opacity-80' : ''} ${post.pinned ? 'ring-2 ring-green-500/30' : ''}`}>
+                  <div key={post.id} id={`post-${post.id}`} className={`relative rounded-3xl sm:rounded-[2rem] border backdrop-blur-xl shadow-sm flex flex-col sm:flex-row ${cardBg} ${post.locked ? 'opacity-80' : ''} ${post.pinned ? 'ring-2 ring-green-500/30' : ''} ${openPopupId?.includes(post.id) ? 'z-50' : 'z-10'}`}>
                       
-                      {/* DESKTOP UPVOTE COLUMN */}
-                      <div className={`hidden sm:flex w-16 flex-col items-center pt-6 px-0 border-r shrink-0 ${darkMode ? 'bg-white/[0.02] border-white/5' : 'bg-black/[0.02] border-black/5'}`}>
+                      <div className={`hidden sm:flex w-16 flex-col items-center pt-6 px-0 border-r shrink-0 rounded-l-3xl sm:rounded-l-[2rem] ${darkMode ? 'bg-white/[0.02] border-white/5' : 'bg-black/[0.02] border-black/5'}`}>
                           <button onClick={() => handleUpvote(post)} className={`w-8 h-8 flex items-center justify-center rounded-full transition-transform hover:bg-blue-500/10 ${hasUpvoted ? 'text-blue-500 scale-110' : 'opacity-40 hover:opacity-100 hover:text-blue-500'}`}>
                               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4l-8 8h5v8h6v-8h5z"/></svg>
                           </button>
@@ -514,19 +612,17 @@ export default function Forum() {
                           <span className="text-[10px] opacity-40 font-bold mt-4" title={`${post.replies?.length || 0} răspunsuri`}>💬 {post.replies?.length || 0}</span>
                       </div>
 
-                      {/* CONȚINUT POSTARE */}
                       <div className="flex-1 p-3.5 sm:p-6 min-w-0 flex flex-col">
                           
                           <div className="flex justify-between items-start gap-2 sm:gap-4 mb-3 sm:mb-4">
                               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                                   <UserAvatar uid={post.authorId} name={post.authorName} size="sm" />
                                   <div className="flex flex-col min-w-0">
-                                      {renderUserInfoWithHover(post.authorId, post.authorId, post.authorName, false)}
+                                      {renderUserInfoWithClick(post.authorId, post.authorId, post.authorName, `post-${post.id}`, false)}
                                       <p className="text-[9px] sm:text-[10px] opacity-50 font-mono mt-0.5 truncate"><span className="font-sans font-medium">{timeAgo(post.createdAt)}</span></p>
                                   </div>
                               </div>
                               
-                              {/* ACTIONS DESKTOP */}
                               <div className="hidden sm:flex items-center gap-1 shrink-0 bg-black/5 dark:bg-white/5 p-1 rounded-xl border border-black/5 dark:border-white/5">
                                   {post.locked && <span className="text-[9px] font-black text-orange-500 bg-orange-500/10 px-1.5 py-1 rounded border border-orange-500/20 mr-1">🔒 ÎNCHIS</span>}
                                   {user.role === 'admin' && (
@@ -564,7 +660,6 @@ export default function Forum() {
 
                           {post.imageUrl && <img src={post.imageUrl} alt="Forum" className="w-full max-h-56 sm:max-h-80 rounded-xl sm:rounded-2xl mb-2 sm:mb-4 border border-black/10 dark:border-white/10 object-cover" />}
 
-                          {/* BARA DE ACȚIUNI MOBIL */}
                           <div className="flex sm:hidden items-center justify-between mt-2 pt-2 border-t border-black/10 dark:border-white/10">
                               <div className="flex items-center gap-2">
                                   <button onClick={() => handleUpvote(post)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${hasUpvoted ? 'bg-blue-500/10 text-blue-500 font-black' : 'bg-black/5 dark:bg-white/5 opacity-70 font-bold'}`}>
@@ -594,33 +689,78 @@ export default function Forum() {
                               </div>
                           </div>
 
-                          {/* REPLIES SECTION */}
-                          {post.replies?.length > 0 && (
+                          {sortedReplies.length > 0 && (
                             <div className={`mt-3 sm:mt-4 pt-3 sm:pt-4 space-y-3 border-t ${darkMode?'border-white/5':'border-slate-100'} ${post.locked ? 'opacity-80' : ''}`}>
-                                {post.replies?.map((reply:any) => (
+                                {visibleRepliesList.map((reply:any) => {
+                                    const hasLikedReply = reply.likes?.includes(user.id);
+
+                                    return (
                                     <div key={reply.id} className="flex gap-2 sm:gap-3 items-start group relative">
                                         <div className="mt-1"><UserAvatar uid={reply.authorId} name={reply.authorName} size="xs" /></div>
-                                        <div className={`flex-1 p-2.5 sm:p-3.5 rounded-2xl rounded-tl-sm border min-w-0 ${darkMode ? 'bg-black/20 border-white/5' : 'bg-slate-50 border-slate-100'}`}>
-                                            <div className="flex justify-between items-start mb-1 gap-2">
-                                                {renderUserInfoWithHover(reply.authorId, post.authorId, reply.authorName, true)}
-                                                <div className="flex items-center gap-1.5 shrink-0">
-                                                    <span className="text-[8px] sm:text-[10px] opacity-40 font-sans font-medium whitespace-nowrap">{timeAgo(reply.createdAt)}</span>
-                                                    {(user.role === 'admin' || user.id === reply.authorId) && (
-                                                        <button onClick={() => deleteReply(post.id, reply)} className="text-[10px] text-red-500 font-black px-1.5 py-0.5 sm:opacity-0 group-hover:opacity-100 hover:bg-red-500/10 rounded transition">✕</button>
-                                                    )}
+                                        <div 
+                                            className={`flex-1 p-2.5 sm:p-3.5 rounded-2xl rounded-tl-sm border min-w-0 flex items-start gap-2 sm:gap-3 ${darkMode ? 'bg-black/20 border-white/5' : 'bg-slate-50 border-slate-100'} transition-all hover:border-white/10`}
+                                            onDoubleClick={(e) => { e.stopPropagation(); handleReplyUpvote(post.id, reply); }}
+                                        >
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex justify-between items-start mb-1 gap-2">
+                                                    {renderUserInfoWithClick(reply.authorId, post.authorId, reply.authorName, `reply-${post.id}-${reply.id}`, true)}
+                                                    <div className="flex items-center gap-1.5 shrink-0">
+                                                        <span className="text-[8px] sm:text-[10px] opacity-40 font-sans font-medium whitespace-nowrap">{timeAgo(reply.createdAt)}</span>
+                                                        {(user.role === 'admin' || user.id === reply.authorId) && (
+                                                            <button onClick={(e) => { e.stopPropagation(); deleteReply(post.id, reply.id); }} className="text-[10px] text-red-500 font-black px-1.5 py-0.5 sm:opacity-0 group-hover:opacity-100 hover:bg-red-500/10 rounded transition">✕</button>
+                                                        )}
+                                                    </div>
                                                 </div>
+                                                
+                                                <p className="text-[11px] sm:text-sm opacity-90 mb-2 cursor-default select-none sm:select-text" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                                                    {reply.text.split(' ').map((word: string, i: number) => 
+                                                        word.startsWith('@') ? <span key={i} className="text-blue-500 font-bold">{word} </span> : word + ' '
+                                                    )}
+                                                </p>
+
+                                                {reply.imageUrl && <img src={reply.imageUrl} alt="Reply" className="w-full max-h-40 sm:max-h-60 rounded-xl mt-2 mb-2 border border-black/5 dark:border-white/5 object-cover pointer-events-none" />}
+
+                                                {!post.locked && (
+                                                    <button onClick={(e) => { e.stopPropagation(); setReplyingTo({...replyingTo, [post.id]: {userId: reply.authorId, userName: reply.authorName}}); }} className="flex items-center gap-1 text-[10px] font-bold opacity-50 hover:opacity-100 hover:text-blue-500 transition-colors mt-1">
+                                                        💬 Răspunde
+                                                    </button>
+                                                )}
                                             </div>
-                                            <p className="text-[11px] sm:text-sm opacity-90" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{reply.text}</p>
-                                            {reply.imageUrl && <img src={reply.imageUrl} alt="Reply" className="w-full max-h-40 sm:max-h-60 rounded-xl mt-2 border border-black/5 dark:border-white/5 object-cover" />}
+
+                                            <div className="flex flex-col items-center shrink-0 pt-1">
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); handleReplyUpvote(post.id, reply); }} 
+                                                    className={`p-1.5 sm:p-2 rounded-full transition-colors flex items-center justify-center ${hasLikedReply ? 'text-red-500 bg-red-500/10' : 'opacity-40 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5 hover:text-red-500'}`}
+                                                >
+                                                    <svg className="w-4 h-4 sm:w-5 sm:h-5" fill={hasLikedReply ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                                                </button>
+                                                {reply.likes?.length > 0 && (
+                                                    <span className={`text-[9px] sm:text-[10px] font-bold mt-0.5 ${hasLikedReply ? 'text-red-500' : 'opacity-50'}`}>
+                                                        {reply.likes.length}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                ))}
+                                )})}
+
+                                {sortedReplies.length > currentLimit && (
+                                    <button onClick={() => setVisibleReplies(prev => ({...prev, [post.id]: currentLimit + 5}))} className="w-full text-center text-xs font-bold text-blue-500 hover:underline py-2 opacity-80 transition-all">
+                                        Vezi mai multe răspunsuri ({sortedReplies.length - currentLimit}) ⬇
+                                    </button>
+                                )}
                             </div>
                           )}
 
-                          {/* INPUT RĂSPUNS NOU */}
                           {!post.locked ? (
                               <div className="flex flex-col gap-2 mt-3 sm:mt-6">
+                                  {replyingTo[post.id] && (
+                                      <div className="flex items-center gap-2 mb-1 text-[10px] sm:text-xs text-blue-500 bg-blue-500/10 px-3 py-1.5 rounded-lg w-fit transition-all">
+                                          <span>Răspunzi lui <strong>@{replyingTo[post.id]?.userName}</strong></span>
+                                          <button onClick={() => setReplyingTo(prev => ({...prev, [post.id]: null}))} className="text-red-500 hover:text-red-400 ml-2 font-black">✕</button>
+                                      </div>
+                                  )}
+
                                   <div className={`flex items-center p-1 sm:p-1.5 rounded-full border focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all ${inputBg}`}>
                                       <label className="w-8 h-8 sm:w-10 sm:h-10 rounded-full opacity-50 hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer flex items-center justify-center transition shrink-0">
                                           🖼️<input type="file" accept="image/*" className="hidden" onChange={(e)=>handleImageChange(e, (file:any) => setReplyImages({...replyImages, [post.id]: file}))} />
@@ -643,7 +783,6 @@ export default function Forum() {
           </div>
         </div>
 
-        {/* SIDEBAR DREAPTA (Desktop) */}
         <div className="space-y-4 sm:space-y-6 lg:sticky lg:top-28 h-fit">
             
             <div className={`hidden sm:block p-8 rounded-[2rem] border backdrop-blur-xl shadow-sm ${cardBg}`}>
@@ -704,11 +843,9 @@ export default function Forum() {
                           <UserAvatar uid={user.id} name={user.name} size="md" />
                           <h2 className="text-xl sm:text-2xl font-black leading-tight">Discuție nouă</h2>
                       </div>
-                      {/* Butonul X mutat aici, sigur pe ecran */}
                       <button onClick={() => setShowCreateModal(false)} className="w-10 h-10 bg-black/10 dark:bg-white/10 rounded-full font-black text-lg hover:bg-red-500 hover:text-white hover:rotate-90 transition-all flex items-center justify-center shrink-0">✕</button>
                   </div>
                   
-                  {/* Containerul scrollabil din interior */}
                   <div className="overflow-y-auto custom-scrollbar pr-1 sm:pr-2 flex-1 space-y-4 sm:space-y-6">
                       <div className="flex flex-col sm:flex-row gap-3">
                           <select value={newPostCategory} onChange={e=>setNewPostCategory(e.target.value)} className={`w-full sm:w-1/3 p-4 rounded-2xl text-xs sm:text-sm font-bold outline-none border focus:border-blue-500 transition-colors cursor-pointer ${inputBg}`}>
@@ -726,7 +863,6 @@ export default function Forum() {
                       {newPostImage && <p className="text-[10px] sm:text-xs font-bold text-green-500">✅ Imagine atașată: {newPostImage.name}</p>}
                   </div>
 
-                  {/* Partea de jos (Butoanele) - Fixed la finalul popup-ului */}
                   <div className="flex flex-col sm:flex-row justify-between items-center border-t pt-4 sm:pt-6 mt-4 border-black/10 dark:border-white/10 gap-3 shrink-0">
                       <label className="w-full sm:w-auto text-xs sm:text-sm font-bold opacity-60 hover:opacity-100 hover:text-blue-500 cursor-pointer transition flex items-center justify-center gap-2 bg-black/5 dark:bg-white/5 px-4 py-3 rounded-xl border border-transparent hover:border-blue-500/30">
                           📸 <span>Adaugă Imagine</span>
@@ -743,7 +879,7 @@ export default function Forum() {
 
       {/* ADMIN MODAL (Adaptat Mobile) */}
       {adminUserModal && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md">
+          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md">
             <div className={`w-full max-w-2xl h-fit max-h-[85vh] p-5 pt-6 sm:p-8 rounded-t-[2rem] sm:rounded-[2.5rem] border shadow-2xl relative animate-popup flex flex-col ${cardBg}`}>
               
               <div className="flex justify-between items-start mb-4 border-b border-black/10 dark:border-white/10 pb-4 shrink-0 gap-4">
@@ -822,7 +958,6 @@ export default function Forum() {
         </div>
       )}
 
-      {/* NOTIFICARI MODAL (Adaptat Mobile) */}
       {showNotif && (
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md">
           <div className={`w-full max-w-md h-fit max-h-[85vh] p-5 pt-6 sm:p-8 rounded-t-[2rem] sm:rounded-[2.5rem] border shadow-2xl relative animate-popup flex flex-col ${cardBg}`}>
@@ -835,13 +970,13 @@ export default function Forum() {
             <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-3">
               {notifications.length === 0 && <p className="opacity-50 text-xs italic text-center py-10">Nicio notificare momentan.</p>}
               {notifications.map(n => (
-                  <div key={n.id} className={`p-4 rounded-2xl border flex justify-between items-start gap-4 ${darkMode ? 'bg-white/5 border-white/5' : 'bg-slate-100 border-slate-200'}`}>
-                    <div className="min-w-0">
+                  <div key={n.id} onClick={() => handleNotifClick(n)} className={`p-4 rounded-2xl border flex justify-between items-start gap-4 cursor-pointer transition-all hover:opacity-80 ${darkMode ? 'bg-white/5 border-white/5' : 'bg-slate-100 border-slate-200'}`}>
+                    <div className="min-w-0 flex-1">
                         <p className="font-black text-xs sm:text-sm mb-1 truncate">{n.title}</p>
-                        <p className="text-[10px] sm:text-xs opacity-80 break-words">{n.message}</p>
+                        <p className="text-[10px] sm:text-xs opacity-80 break-words line-clamp-2">{n.message}</p>
                         <p className="text-[8px] sm:text-[9px] mt-2 font-mono opacity-40">{timeAgo(n.sentAt)}</p>
                     </div>
-                    <button onClick={() => handleDeleteNotif(n.id)} className="text-red-500 bg-red-500/10 hover:bg-red-500 hover:text-white p-2 rounded-lg text-xs shrink-0">✕</button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteNotif(n.id); }} className="text-red-500 bg-red-500/10 hover:bg-red-500 hover:text-white p-2 rounded-lg text-xs shrink-0">✕</button>
                   </div>
               ))}
             </div>
