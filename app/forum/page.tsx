@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { auth, db, storage } from "../lib/firebase"; 
 import { sendPasswordResetEmail, signOut } from "firebase/auth";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { doc, getDoc, updateDoc, collection, arrayUnion, arrayRemove, orderBy, onSnapshot, addDoc, query, deleteDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
@@ -67,7 +67,8 @@ const getUserRank = (role: string, score: number) => {
     return { label: "🌱 Novice", style: "bg-slate-500/20 text-slate-500 border-slate-500/30" };
 };
 
-export default function Forum() {
+// Componenta de bază a forumului (care are nevoie de useSearchParams)
+function ForumContent() {
   const [user, setUser] = useState<any>(null);
   const [usersDb, setUsersDb] = useState<any[]>([]); 
   const [forumPosts, setForumPosts] = useState<any[]>([]);
@@ -105,6 +106,8 @@ export default function Forum() {
   const [editPhone, setEditPhone] = useState("");
 
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [hasScrolled, setHasScrolled] = useState(false);
 
   useEffect(() => {
     if (localStorage.getItem("ghiba_theme") === "light") setDarkMode(false);
@@ -141,6 +144,44 @@ export default function Forum() {
       return () => clearInterval(timer);
   }, [postCooldown]);
 
+  // LOGICA REPARATĂ PENTRU SCROLL AUTOMAT
+  useEffect(() => {
+      const targetPostId = searchParams?.get("postId");
+      
+      if (targetPostId && !hasScrolled && forumPosts.length > 0) {
+          // Curățăm căutarea și setăm sortarea pe 'nou' pentru a fi siguri că postarea nu e ascunsă
+          if (searchQuery !== "" || sortBy !== "new") {
+              setSearchQuery("");
+              setSortBy("new");
+          }
+
+          let attempts = 0;
+          const checkExist = setInterval(() => {
+              const el = document.getElementById(`post-${targetPostId}`);
+              if (el) {
+                  clearInterval(checkExist);
+                  
+                  // Așteptăm un sfert de secundă pentru a asigura randarea animațiilor CSS, apoi facem scroll
+                  setTimeout(() => {
+                      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      el.classList.add('ring-4', 'ring-blue-500', 'shadow-2xl', 'shadow-blue-500/50', 'transition-all', 'duration-500', 'scale-[1.02]');
+                      
+                      setTimeout(() => {
+                          el.classList.remove('ring-4', 'ring-blue-500', 'shadow-2xl', 'shadow-blue-500/50', 'scale-[1.02]');
+                      }, 2500);
+                      
+                      setHasScrolled(true); 
+                  }, 250);
+              }
+              attempts++;
+              // Ne oprim din căutat după aprox 2 secunde dacă nu o găsește deloc
+              if (attempts > 20) clearInterval(checkExist); 
+          }, 100); 
+
+          return () => clearInterval(checkExist);
+      }
+  }, [searchParams, forumPosts, hasScrolled, searchQuery, sortBy]);
+
   const handleImageChange = (e: any, setFileState: Function) => { if (e.target.files[0]) setFileState(e.target.files[0]); };
 
   const uploadImageToStorage = async (file: File, pathPrefix: string) => {
@@ -163,7 +204,6 @@ export default function Forum() {
       const safeText = censorText(newPostText);
       const postTags = extractTags(safeText);
 
-      // Salvăm postarea nouă ca să îi preluăm ID-ul pentru notificări
       const newPostRef = await addDoc(collection(db, "forum_posts"), {
           title: censorText(newPostTitle), text: safeText, category: newPostCategory, tags: postTags, imageUrl, 
           authorId: user.id, authorName: user.name, authorRole: user.role,
@@ -234,7 +274,6 @@ export default function Forum() {
 
       const post = forumPosts.find(p => p.id === postId);
       
-      // Notificare pentru cine a primit tag
       if (currentReplyTarget && currentReplyTarget.userId !== user.id) {
           await addDoc(collection(db, "users", currentReplyTarget.userId, "notifications"), {
               title: `💬 ${user.name} te-a menționat într-un comentariu!`,
@@ -244,7 +283,6 @@ export default function Forum() {
               read: false
           });
       } 
-      // Notificare pentru autorul postării
       if (post && post.authorId !== user.id && (!currentReplyTarget || currentReplyTarget.userId !== post.authorId)) {
           await addDoc(collection(db, "users", post.authorId, "notifications"), {
               title: `💬 ${user.name} a adăugat un răspuns la discuția ta!`,
@@ -348,11 +386,10 @@ export default function Forum() {
   
   const handleDeleteNotif = async (notifId: string) => { await deleteDoc(doc(db, "users", user.id, "notifications", notifId)); };
   
-  // NOU: Navigare și focusare pe postarea specifică la click pe notificare
   const handleNotifClick = async (n: any) => {
       setShowNotif(false);
       if (n.postId) {
-          setSearchQuery(""); // Resetăm căutările pt a găsi sigur postarea
+          setSearchQuery("");
           setSortBy("new");
           
           setTimeout(() => {
@@ -362,7 +399,7 @@ export default function Forum() {
                   el.classList.add('ring-4', 'ring-blue-500', 'transition-all', 'duration-500');
                   setTimeout(() => el.classList.remove('ring-4', 'ring-blue-500'), 2500);
               }
-          }, 300); // Lăsăm puțin timp pt render
+          }, 300); 
       }
   };
 
@@ -420,10 +457,8 @@ export default function Forum() {
               
               {isOpen && (
                   <>
-                      {/* Fundal invizibil care închide popup-ul când dai click oriunde altundeva */}
                       <div className="fixed inset-0 z-[55]" onClick={(e) => { e.stopPropagation(); setOpenPopupId(null); }}></div>
                       
-                      {/* Fereastra Popup */}
                       <div className={`absolute top-full left-0 mt-2 z-[60] animate-popup w-64 sm:w-72 p-4 rounded-3xl border shadow-2xl text-xs ${darkMode ? 'bg-slate-800 border-white/10' : 'bg-white border-slate-200'}`} onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-between items-start mb-2 gap-2">
                               <div className="min-w-0 flex-1">
@@ -1015,4 +1050,12 @@ export default function Forum() {
       )}
     </div>
   );
+}
+
+export default function Forum() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-black text-white text-xl font-bold animate-pulse">Se încarcă forumul...</div>}>
+            <ForumContent />
+        </Suspense>
+    );
 }

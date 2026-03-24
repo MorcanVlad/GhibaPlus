@@ -6,11 +6,11 @@ import { useRouter } from "next/navigation";
 import { doc, getDoc, updateDoc, collection, arrayUnion, arrayRemove, orderBy, onSnapshot, addDoc, query, deleteDoc } from "firebase/firestore";
 
 const TRANSLATIONS: any = {
-  ro: { search: "Caută noutăți...", settings: "Setări", admin: "ADMIN", welcomeTitle: "Bine ai venit,", welcomeMsg: "Ne bucurăm să te avem pe GhibaPlus.", notif: "Notificări", noNotif: "Nicio notificare momentan.", dateTime: "DATA / ORA", location: "LOCAȚIE", join: "Particip ✅", cancel: "Retrage-te", teamJoin: "Înscrie Echipă 👥", teamManage: "Gestionează Echipa", lang: "Limba Interfeței", class: "Clasa Ta", phone: "Număr de Telefon", save: "Salvează Setările", council: "Consiliul Elevilor", noSpots: "Locuri epuizate!", translating: "Se traduce...", resetPass: "🔑 Trimite link resetare parolă", resetSent: "Email-ul a fost trimis!", allSchool: "Toată Școala", myClass: "Clasa Mea", logout: "Deconectare", spots: "Locuri", unlimited: "Nelimitat", calendarTitle: "📅 Calendarul Meu", contactAdmin: "Contactează Administratorul", ruleAny: "Liber (Fără restricții)", ruleSameClass: "Strict: Doar din clasa ta", rulePlusOne: "Maxim 1 elev din altă clasă" },
-  en: { search: "Search news...", settings: "Settings", admin: "ADMIN", welcomeTitle: "Welcome,", welcomeMsg: "Glad to have you on GhibaPlus.", notif: "Notifications", noNotif: "No notifications.", dateTime: "DATE / TIME", location: "LOCATION", join: "Join ✅", cancel: "Leave", teamJoin: "Register Team 👥", teamManage: "Manage Team", lang: "Interface Language", class: "Your Class", phone: "Phone Number", save: "Save Settings", council: "Student Council", noSpots: "No spots left!", translating: "Translating...", resetPass: "🔑 Send password reset link", resetSent: "Email sent!", allSchool: "Whole School", myClass: "My Class", logout: "Logout", spots: "Spots", unlimited: "Unlimited", calendarTitle: "📅 My Calendar", contactAdmin: "Contact Administrator", ruleAny: "No restrictions", ruleSameClass: "Strict: Same class only", rulePlusOne: "Max 1 from another class" },
-  fr: { search: "Recherche...", settings: "Paramètres", admin: "ADMIN", welcomeTitle: "Bienvenue,", welcomeMsg: "Heureux de vous avoir sur GhibaPlus !", notif: "Notifications", noNotif: "Pas de notifications.", dateTime: "DATE / HEURE", location: "LIEU", join: "Participer ✅", cancel: "Annuler", teamJoin: "Inscrire l'équipe 👥", teamManage: "Gérer l'équipe", lang: "Langue", class: "Classe", phone: "Téléphone", save: "Enregistrer", council: "Conseil", noSpots: "Complet!", translating: "Traduction...", resetPass: "🔑 Réinitialiser le mot de passe", resetSent: "Email envoyé !", allSchool: "Toute l'école", myClass: "Ma Classe", logout: "Déconnexion", spots: "Places", unlimited: "Illimité", calendarTitle: "📅 Mon Calendrier", contactAdmin: "Contacter l'administrateur", ruleAny: "Aucune restriction", ruleSameClass: "Strict: Même classe", rulePlusOne: "Max 1 d'une autre classe" },
-  de: { search: "Suche...", settings: "Einstellungen", admin: "ADMIN", welcomeTitle: "Willkommen,", welcomeMsg: "Schön, dass du bei GhibaPlus bist!", notif: "Benachrichtigungen", noNotif: "Keine Nachrichten.", dateTime: "DATUM / ZEIT", location: "ORT", join: "Teilnehmen ✅", cancel: "Verlassen", teamJoin: "Team anmelden 👥", teamManage: "Team verwalten", lang: "Sprache", class: "Klasse", phone: "Telefon", save: "Speichern", council: "Schülerrat", noSpots: "Voll!", translating: "Übersetzen...", resetPass: "🔑 Passwort zurücksetzen", resetSent: "E-Mail gesendet!", allSchool: "Ganze Schule", myClass: "Meine Klasse", logout: "Abmelden", spots: "Plätze", unlimited: "Unbegrenzt", calendarTitle: "📅 Mein Kalender", contactAdmin: "Administrator kontaktieren", ruleAny: "Keine Einschränkungen", ruleSameClass: "Streng: Gleiche Klasse", rulePlusOne: "Max 1 aus anderer Klasse" },
-  es: { search: "Buscar...", settings: "Ajustes", admin: "ADMIN", welcomeTitle: "¡Bienvenido,", welcomeMsg: "Nos alegra tenerte en GhibaPlus.", notif: "Notificaciones", noNotif: "Sin notificaciones.", dateTime: "FECHA / HORA", location: "UBICACIÓN", join: "Participar ✅", cancel: "Salir", teamJoin: "Registrar Equipo 👥", teamManage: "Gestionar Equipo", lang: "Idioma", class: "Clase", phone: "Teléfono", save: "Guardar", council: "Consejo", noSpots: "¡Lleno!", translating: "Traduciendo...", resetPass: "🔑 Restablecer contraseña", resetSent: "¡Correo enviado!", allSchool: "Toda la Escuela", myClass: "Mi Clase", logout: "Cerrar sesión", spots: "Lugares", unlimited: "Ilimitado", calendarTitle: "📅 Mi Calendario", contactAdmin: "Contactar Administrador", ruleAny: "Sin restricciones", ruleSameClass: "Estricto: Misma clase", rulePlusOne: "Máx 1 de otra clase" }
+  ro: { search: "Caută noutăți...", settings: "Setări", admin: "ADMIN", welcomeTitle: "Bine ai venit,", welcomeMsg: "Ne bucurăm să te avem pe GhibaPlus.", notif: "Notificări", noNotif: "Nicio notificare momentan.", dateTime: "DATA / ORA", location: "LOCAȚIE", join: "Particip ✅", cancel: "Retrage-te", teamJoin: "Înscrie Echipă 👥", teamManage: "Gestionează Echipa", lang: "Limba Interfeței", class: "Clasa Ta", phone: "Număr de Telefon", save: "Salvează Setările", council: "Consiliul Elevilor", noSpots: "Locuri epuizate!", translating: "Se traduce...", resetPass: "🔑 Trimite link resetare parolă", resetSent: "Email-ul a fost trimis!", allSchool: "Toată Școala", myClass: "Clasa Mea", logout: "Deconectare", spots: "Locuri", unlimited: "Nelimitat", calendarTitle: "📅 Calendarul Meu", contactAdmin: "Contactează Administratorul", ruleAny: "Liber (Fără restricții)", ruleSameClass: "Strict: Doar din clasa ta", rulePlusOne: "Maxim 1 elev din altă clasă", forumWarningTitle: "Atenție", forumWarning: "Forumul este exclusiv în limba română și nu beneficiază de traducere automată.", continueBtn: "Continuă" },
+  en: { search: "Search news...", settings: "Settings", admin: "ADMIN", welcomeTitle: "Welcome,", welcomeMsg: "Glad to have you on GhibaPlus.", notif: "Notifications", noNotif: "No notifications.", dateTime: "DATE / TIME", location: "LOCATION", join: "Join ✅", cancel: "Leave", teamJoin: "Register Team 👥", teamManage: "Manage Team", lang: "Interface Language", class: "Your Class", phone: "Phone Number", save: "Save Settings", council: "Student Council", noSpots: "No spots left!", translating: "Translating...", resetPass: "🔑 Send password reset link", resetSent: "Email sent!", allSchool: "Whole School", myClass: "My Class", logout: "Logout", spots: "Spots", unlimited: "Unlimited", calendarTitle: "📅 My Calendar", contactAdmin: "Contact Administrator", ruleAny: "No restrictions", ruleSameClass: "Strict: Same class only", rulePlusOne: "Max 1 from another class", forumWarningTitle: "Warning", forumWarning: "The forum is exclusively in Romanian and does not have automatic translation.", continueBtn: "Continue" },
+  fr: { search: "Recherche...", settings: "Paramètres", admin: "ADMIN", welcomeTitle: "Bienvenue,", welcomeMsg: "Heureux de vous avoir sur GhibaPlus !", notif: "Notifications", noNotif: "Pas de notifications.", dateTime: "DATE / HEURE", location: "LIEU", join: "Participer ✅", cancel: "Annuler", teamJoin: "Inscrire l'équipe 👥", teamManage: "Gérer l'équipe", lang: "Langue", class: "Classe", phone: "Téléphone", save: "Enregistrer", council: "Conseil", noSpots: "Complet!", translating: "Traduction...", resetPass: "🔑 Réinitialiser le mot de passe", resetSent: "Email envoyé !", allSchool: "Toute l'école", myClass: "Ma Classe", logout: "Déconnexion", spots: "Places", unlimited: "Illimité", calendarTitle: "📅 Mon Calendrier", contactAdmin: "Contacter l'administrateur", ruleAny: "Aucune restriction", ruleSameClass: "Strict: Même classe", rulePlusOne: "Max 1 d'une autre classe", forumWarningTitle: "Attention", forumWarning: "Le forum est exclusivement en roumain et ne bénéficie pas de traduction automatique.", continueBtn: "Continuer" },
+  de: { search: "Suche...", settings: "Einstellungen", admin: "ADMIN", welcomeTitle: "Willkommen,", welcomeMsg: "Schön, dass du bei GhibaPlus bist!", notif: "Benachrichtigungen", noNotif: "Keine Nachrichten.", dateTime: "DATUM / ZEIT", location: "ORT", join: "Teilnehmen ✅", cancel: "Verlassen", teamJoin: "Team anmelden 👥", teamManage: "Team verwalten", lang: "Sprache", class: "Klasse", phone: "Telefon", save: "Speichern", council: "Schülerrat", noSpots: "Voll!", translating: "Übersetzen...", resetPass: "🔑 Passwort zurücksetzen", resetSent: "E-Mail gesendet!", allSchool: "Ganze Schule", myClass: "Meine Klasse", logout: "Abmelden", spots: "Plätze", unlimited: "Unbegrenzt", calendarTitle: "📅 Mein Kalender", contactAdmin: "Administrator kontaktieren", ruleAny: "Keine Einschränkungen", ruleSameClass: "Streng: Gleiche Klasse", rulePlusOne: "Max 1 aus anderer Klasse", forumWarningTitle: "Achtung", forumWarning: "Das Forum ist ausschließlich auf Rumänisch und wird nicht automatisch übersetzt.", continueBtn: "Weiter" },
+  es: { search: "Buscar...", settings: "Ajustes", admin: "ADMIN", welcomeTitle: "¡Bienvenido,", welcomeMsg: "Nos alegra tenerte en GhibaPlus.", notif: "Notificaciones", noNotif: "Sin notificaciones.", dateTime: "FECHA / HORA", location: "UBICACIÓN", join: "Participar ✅", cancel: "Salir", teamJoin: "Registrar Equipo 👥", teamManage: "Gestionar Equipo", lang: "Idioma", class: "Clase", phone: "Teléfono", save: "Guardar", council: "Consejo", noSpots: "¡Lleno!", translating: "Traduciendo...", resetPass: "🔑 Restablecer contraseña", resetSent: "¡Correo enviado!", allSchool: "Toda la Escuela", myClass: "Mi Clase", logout: "Cerrar sesión", spots: "Lugares", unlimited: "Ilimitado", calendarTitle: "📅 Mi Calendario", contactAdmin: "Contactar Administrador", ruleAny: "Sin restricciones", ruleSameClass: "Estricto: Misma clase", rulePlusOne: "Máx 1 de otra clase", forumWarningTitle: "Atención", forumWarning: "El foro está exclusivamente en rumano y no cuenta con traducción automática.", continueBtn: "Continuar" }
 };
 
 export default function Dashboard() {
@@ -54,6 +54,9 @@ export default function Dashboard() {
   const [showClassChangePopup, setShowClassChangePopup] = useState(false);
   const [showGraduatePopup, setShowGraduatePopup] = useState(false);
   const [newClassName, setNewClassName] = useState("");
+  
+  // NOU: Pop-up avertizare limbă forum
+  const [showForumLangWarning, setShowForumLangWarning] = useState(false);
 
   const [now, setNow] = useState(new Date());
   
@@ -62,7 +65,6 @@ export default function Dashboard() {
   const translationCache = useRef(new Map());
   const router = useRouter();
 
-  // NOU: Citim URL-ul pentru a deschide tab-ul de Evenimente dacă venim din Forum
   useEffect(() => {
       if (typeof window !== 'undefined') {
           const params = new URLSearchParams(window.location.search);
@@ -91,6 +93,17 @@ export default function Dashboard() {
         const isGraduate = userData.class === "Absolvent";
         const langToSet = isGraduate ? "ro" : (userData.language || "ro");
         setCurrentLang(langToSet); setEditLang(langToSet);
+        
+        // NOU: Notificare "Bine ai venit" la prima înregistrare
+        if (!userData.welcomeSent) {
+            await addDoc(collection(db, "users", u.uid, "notifications"), {
+                title: `${TRANSLATIONS[langToSet]?.welcomeTitle || "Bine ai venit,"} ${userData.name}`,
+                message: TRANSLATIONS[langToSet]?.welcomeMsg || "Ne bucurăm să te avem pe GhibaPlus.",
+                sentAt: new Date().toISOString(),
+                read: false
+            });
+            await updateDoc(doc(db, "users", u.uid), { welcomeSent: true });
+        }
         
         if (userData.lastSeenClass && userData.lastSeenClass !== userData.class) {
             if (userData.class === "Absolvent") {
@@ -137,11 +150,9 @@ export default function Dashboard() {
       if (!user) return;
       let allItems = [...news, ...events];
       
-      // Feed-ul principal (fără vacanțe/examene care sunt doar informative)
       let feedItems = [...allItems];
       setFeed(feedItems.filter(item => item.type !== 'holiday' && item.type !== 'exam'));
       
-      // Calendarul Sidebar (doar evenimentele la care ești înscris)
       let calItems = allItems.filter(item => item.col === 'calendar_events');
       const today = new Date(); today.setHours(0, 0, 0, 0);
       calItems = calItems.filter((item:any) => {
@@ -239,6 +250,14 @@ export default function Dashboard() {
 
   const handleDeleteNotif = async (notifId: string) => { await deleteDoc(doc(db, "users", user.id, "notifications", notifId)); };
 
+  // NOU: Funcția care controlează click-ul pe notificare
+  const handleNotifClick = (n: any) => {
+      setShowNotif(false);
+      if (n.postId) {
+          router.push(`/forum?postId=${n.postId}`);
+      }
+  };
+
   const sendNotification = async (title: string, message: string) => {
       await addDoc(collection(db, "users", user.id, "notifications"), { title, message, sentAt: new Date().toISOString(), read: false });
   };
@@ -251,6 +270,15 @@ export default function Dashboard() {
       });
       alert("✅ Mesajul tău a fost trimis administratorilor!");
       setShowContactAdmin(false); setContactMessage("");
+  };
+
+  // NOU: Funcția care controlează butonul de Forum (pentru a arăta pop-up-ul de limbă)
+  const handleForumClick = () => {
+      if (currentLang !== 'ro') {
+          setShowForumLangWarning(true);
+      } else {
+          router.push('/forum');
+      }
   };
 
   const handleRegisterClick = async (e: any, item: any) => {
@@ -420,6 +448,10 @@ export default function Dashboard() {
         
         @keyframes gradMove { 0% { background-position: 0% 0%; } 50% { background-position: 100% 100%; } 100% { background-position: 0% 0%; } }
         body { background-size: 200% 200%; animation: gradMove 15s ease infinite; }
+        
+        /* SCROLLBAR CUSTOM FOR NOTIFICATIONS */
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(156, 163, 175, 0.5); border-radius: 10px; }
       `}} />
 
       <nav className={`fixed top-0 w-full z-40 px-4 py-3 sm:py-4 backdrop-blur-2xl border-b flex justify-between items-center transition-all ${darkMode ? 'bg-slate-950/80 border-white/10' : 'bg-white/80 border-slate-200'}`}>
@@ -462,7 +494,8 @@ export default function Dashboard() {
               <div className="flex gap-2">
                   <button onClick={() => setMainTab("anunturi")} className={`px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-black rounded-xl transition-all duration-300 ${mainTab === 'anunturi' ? 'bg-red-500 text-white shadow-md' : 'opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}>📢 ANUNȚURI</button>
                   <button onClick={() => setMainTab("evenimente")} className={`px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-black rounded-xl transition-all duration-300 ${mainTab === 'evenimente' ? 'bg-green-500 text-white shadow-md' : 'opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}>🎟️ EVENIMENTE</button>
-                  <button onClick={() => router.push('/forum')} className={`px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-black rounded-xl transition-all duration-300 opacity-60 hover:opacity-100 hover:bg-blue-500/10 hover:text-blue-500`}>💬 FORUM</button>
+                  {/* MODIFICAT AICI: Butonul Forum cu verificare limbă */}
+                  <button onClick={handleForumClick} className={`px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-black rounded-xl transition-all duration-300 opacity-60 hover:opacity-100 hover:bg-blue-500/10 hover:text-blue-500`}>💬 FORUM</button>
               </div>
           </div>
 
@@ -588,6 +621,26 @@ export default function Dashboard() {
         </div>
       </main>
 
+      {/* POP-UP AVERTIZARE FORUM LIMBĂ STRĂINĂ */}
+      {showForumLangWarning && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <div className={`w-full max-w-sm p-8 rounded-[2rem] border shadow-2xl relative animate-popup text-center ${cardBg}`}>
+                <div className="w-16 h-16 bg-blue-500/20 text-blue-500 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 border border-blue-500/30">🌍</div>
+                <h2 className="text-xl font-black mb-3 text-blue-500">{t.forumWarningTitle}</h2>
+                <p className="text-sm opacity-80 mb-6 leading-relaxed">{t.forumWarning}</p>
+                
+                <div className="flex gap-3">
+                    <button onClick={() => setShowForumLangWarning(false)} className="flex-1 py-3 bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20 rounded-xl font-bold transition-all text-sm">
+                        {t.cancel || "Cancel"}
+                    </button>
+                    <button onClick={() => router.push('/forum')} className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-black transition-all shadow-lg text-sm">
+                        {t.continueBtn}
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
       {showSettings && !showContactAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <div className={`w-full max-w-lg p-8 sm:p-10 rounded-[2.5rem] border shadow-2xl relative animate-popup ${cardBg}`}>
@@ -689,6 +742,7 @@ export default function Dashboard() {
           </div>
       )}
 
+      {/* MODIFICAT AICI: Pop-up-ul cu notificările (adăugat eventul pe div-ul fiecărei notificări) */}
       {showNotif && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <div className={`w-full max-w-md p-6 sm:p-8 rounded-[2.5rem] border shadow-2xl relative animate-popup ${cardBg}`}>
@@ -697,13 +751,13 @@ export default function Dashboard() {
             <div className="space-y-3 sm:space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
               {translatedNotifications.length === 0 && <p className="opacity-50 text-sm italic text-center py-10">{t.noNotif}</p>}
               {translatedNotifications.map(n => (
-                  <div key={n.id} className={`p-4 rounded-xl sm:rounded-2xl border flex justify-between items-start gap-3 sm:gap-4 transition-colors hover:border-red-500/30 ${darkMode ? 'bg-white/5 border-white/5' : 'bg-slate-100 border-slate-200'}`}>
+                  <div key={n.id} onClick={() => handleNotifClick(n)} className={`p-4 rounded-xl sm:rounded-2xl border flex justify-between items-start gap-3 sm:gap-4 transition-colors hover:border-red-500/30 cursor-pointer ${darkMode ? 'bg-white/5 border-white/5 hover:bg-white/10' : 'bg-slate-100 border-slate-200 hover:bg-slate-200'}`}>
                     <div>
                         <p className="font-black text-xs sm:text-sm mb-1 leading-snug">{n.translatedTitle || n.title}</p>
                         <p className="text-xs sm:text-sm opacity-80 leading-relaxed">{n.translatedMessage || n.message}</p>
                         <p className="text-[9px] sm:text-[10px] mt-2 font-mono opacity-40">{new Date(n.sentAt).toLocaleString('ro-RO')}</p>
                     </div>
-                    <button onClick={() => handleDeleteNotif(n.id)} className="text-red-500 bg-red-500/10 hover:bg-red-500 hover:text-white p-2 rounded-lg transition-colors text-xs" title="Șterge">✕</button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteNotif(n.id); }} className="text-red-500 bg-red-500/10 hover:bg-red-500 hover:text-white p-2 rounded-lg transition-colors text-xs" title="Șterge">✕</button>
                   </div>
               ))}
             </div>
