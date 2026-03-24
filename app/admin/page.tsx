@@ -13,6 +13,8 @@ export default function AdminPanel() {
   const [whitelistDb, setWhitelistDb] = useState<any[]>([]);
   
   const [adminMessages, setAdminMessages] = useState<any[]>([]);
+  const [securityLogs, setSecurityLogs] = useState<any[]>([]); // NOU: State pentru log-uri
+  
   const [darkMode, setDarkMode] = useState(true);
   
   const [currentUserRole, setCurrentUserRole] = useState<string>("user");
@@ -51,6 +53,7 @@ export default function AdminPanel() {
   const [emailList, setEmailList] = useState("");
   const [whitelistSearch, setWhitelistSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");
+  const [logSearch, setLogSearch] = useState(""); // NOU: Căutare pentru log-uri
   
   const [viewAttendeesModal, setViewAttendeesModal] = useState<any>(null);
   const [viewUserHistory, setViewUserHistory] = useState<any>(null);
@@ -70,6 +73,10 @@ export default function AdminPanel() {
           if(snap.data().role === 'admin') {
               onSnapshot(query(collection(db, "admin_messages"), orderBy("createdAt", "desc")), (s) => {
                   setAdminMessages(s.docs.map(d => ({id: d.id, ...d.data()})));
+              });
+              // NOU: Ascultăm log-urile de securitate
+              onSnapshot(query(collection(db, "security_logs"), orderBy("timestamp", "desc")), (s) => {
+                  setSecurityLogs(s.docs.map(d => ({id: d.id, ...d.data()})));
               });
           }
       }
@@ -94,6 +101,27 @@ export default function AdminPanel() {
 
   const handleDelete = async (id: string, col: string) => {
     if(!confirm("Ești sigur că vrei să ștergi definitiv?")) return;
+    
+    // NOU: Jurnalizăm ștergerea (cu detalii despre ce a fost șters)
+    const itemToDelete = posts.find(p => p.id === id) || users.find(u => u.id === id) || whitelistDb.find(w => w.id === id);
+    let detailsText = `A șters un document cu ID-ul: ${id} din colecția: ${col}`;
+    
+    if (itemToDelete?.title) {
+        detailsText = `A șters o postare din gestiune.\nTitlu: "${itemToDelete.title}"\nConținut: "${itemToDelete.content || 'Fără text'}"`;
+    } else if (itemToDelete?.name) {
+        detailsText = `A șters utilizatorul: ${itemToDelete.name} (${itemToDelete.email})`;
+    }
+
+    try {
+        await addDoc(collection(db, "security_logs"), {
+            action: "ȘTERGERE_ADMIN",
+            userName: users.find(u => u.id === currentUserId)?.name || "Necunoscut",
+            userRole: currentUserRole,
+            details: detailsText,
+            timestamp: new Date().toISOString()
+        });
+    } catch(e) {}
+
     await deleteDoc(doc(db, col, id));
     fetchData();
   };
@@ -194,7 +222,6 @@ export default function AdminPanel() {
   };
 
   const handleAddWhitelist = async () => {
-      // Reparat: Dacă nu conține '@', se adaugă automat '@ghibabirta.ro'
       const emails = emailList.split(/[\n,]+/)
           .map(e => e.trim().toLowerCase())
           .filter(e => e.length > 0)
@@ -226,6 +253,22 @@ export default function AdminPanel() {
   const handleUpdatePost = async (e: React.FormEvent) => {
       e.preventDefault();
       const updatedData: any = { title, content, imageUrl, targetClasses: selectedClasses.length === 0 ? ["Toată Școala"] : selectedClasses };
+      
+      // LOGICĂ DE JURNALIZARE A MODIFICĂRILOR
+      let changes = [];
+      if (editingPost.title !== title) changes.push(`👉 Titlu vechi: "${editingPost.title}"\n👉 Titlu nou: "${title}"`);
+      if (editingPost.content !== content) changes.push(`👉 Conținut vechi: "${editingPost.content}"\n👉 Conținut nou: "${content}"`);
+      
+      try {
+          await addDoc(collection(db, "security_logs"), {
+              action: "EDITARE_POSTARE_ADMIN",
+              userName: users.find(u => u.id === currentUserId)?.name || "Necunoscut",
+              userRole: currentUserRole,
+              details: `A modificat postarea din '${editingPost.col}'.\n\n${changes.length > 0 ? changes.join('\n\n') : "Au fost modificate doar setări secundare (dată, imagini, clase, etc)." }`,
+              timestamp: new Date().toISOString()
+          });
+      } catch(e) {}
+
       if (editingPost.col === 'news') {
           updatedData.authorName = authorName; updatedData.linkedPostId = linkedPostId;
       } else {
@@ -330,8 +373,15 @@ export default function AdminPanel() {
       ...(currentUserRole === 'admin' ? [{id:'users', icon:'👥', lbl:'Elevi'}] : []),
       {id:'news', icon:'📢', lbl:'Știri'},
       {id:'events', icon:'📅', lbl:'Evenimente'},
-      ...(currentUserRole === 'admin' ? [{id:'notif', icon:'🔔', lbl:'Notificări'}, {id:'whitelist', icon:'📧', lbl:'Aprobă'}] : [])
+      ...(currentUserRole === 'admin' ? [
+          {id:'notif', icon:'🔔', lbl:'Notificări'}, 
+          {id:'whitelist', icon:'📧', lbl:'Aprobă'},
+          {id:'security', icon:'🛡️', lbl:'Securitate'} // NOU: Tab securitate
+      ] : [])
   ];
+
+  // NOU: Calculăm dacă are permisiunea să modifice participanții pentru evenimentul selectat
+  const canManageAttendees = currentUserRole === 'admin' || viewAttendeesModal?.authorId === currentUserId;
 
   return (
     <div className={`min-h-screen relative font-sans transition-colors duration-500 p-4 sm:p-8 ${bgMain}`}>
@@ -383,6 +433,48 @@ export default function AdminPanel() {
                             </div>
                         </div>
                     )})}
+                </div>
+            </div>
+        )}
+
+        {/* NOU: TAB SECURITATE */}
+        {activeTab === "security" && currentUserRole === 'admin' && (
+            <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
+                <h2 className="text-2xl font-black mb-6 flex items-center gap-2 text-purple-500">🛡️ Jurnal Securitate & Acțiuni</h2>
+                
+                <div className="relative group w-full mb-6 focus-within:max-w-full transition-all duration-500 ease-in-out">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 opacity-40 pointer-events-none z-10 group-focus-within:text-purple-500">🔍</span>
+                    <input 
+                        placeholder="Caută după nume utilizator, dată, acțiune sau cuvinte cheie..." 
+                        className={`w-full rounded-2xl pl-12 pr-5 py-4 text-sm font-bold outline-none border transition-all duration-300 shadow-sm focus:border-purple-500 focus:ring-4 focus:ring-purple-500/20 ${inputBg}`} 
+                        value={logSearch} 
+                        onChange={e => setLogSearch(e.target.value)} 
+                    />
+                </div>
+
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                    {securityLogs.length === 0 && <p className="opacity-50 italic text-center py-10">Nu există înregistrări.</p>}
+                    {securityLogs
+                        .filter(l => (l.userName?.toLowerCase() + l.action?.toLowerCase() + l.details?.toLowerCase() + new Date(l.timestamp).toLocaleString('ro-RO')).includes(logSearch.toLowerCase()))
+                        .map(log => {
+                            const isCensored = log.action.includes('CENZURAT') || log.action.includes('CENZURĂ');
+                            const isDelete = log.action.includes('ȘTERGERE');
+                            return (
+                                <div key={log.id} className={`p-4 rounded-2xl border transition-colors ${darkMode ? 'bg-black/40 border-white/5' : 'bg-slate-50 border-slate-200'} hover:border-purple-500/30`}>
+                                    <div className="flex justify-between items-start mb-2 border-b border-black/10 dark:border-white/10 pb-2">
+                                        <div>
+                                            <p className="font-black text-sm">{log.userName} <span className="text-[10px] opacity-60 font-mono">({log.userRole})</span></p>
+                                            <p className="text-[10px] font-mono opacity-60">{new Date(log.timestamp).toLocaleString('ro-RO')}</p>
+                                        </div>
+                                        <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${isCensored ? 'bg-orange-500/20 text-orange-500' : (isDelete ? 'bg-red-500/20 text-red-500' : 'bg-blue-500/20 text-blue-500')}`}>
+                                            {log.action}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm opacity-80 break-words whitespace-pre-wrap">{log.details}</p>
+                                </div>
+                            )
+                        })
+                    }
                 </div>
             </div>
         )}
@@ -680,12 +772,16 @@ export default function AdminPanel() {
                               <div key={t.leaderId} className={`p-4 border rounded-xl ${darkMode ? 'border-white/10 bg-black/20' : 'border-slate-200 bg-slate-50'}`}>
                                   <div className="flex justify-between font-bold text-blue-500 mb-3 border-b border-black/5 dark:border-white/5 pb-2">
                                       Lider: {t.leaderName} ({t.leaderClass}) - {t.leaderPhone} 
-                                      <button onClick={()=>removeTeamAdmin(viewAttendeesModal, t.leaderId)} className="text-red-500 text-xs hover:underline">Șterge Echipa</button>
+                                      {canManageAttendees && (
+                                          <button onClick={()=>removeTeamAdmin(viewAttendeesModal, t.leaderId)} className="text-red-500 text-xs hover:underline">Șterge Echipa</button>
+                                      )}
                                   </div>
                                   {t.members?.map((m:any) => (
                                       <div key={m.id} className="flex justify-between pl-4 text-sm opacity-80 mb-2">
                                           <span>{m.name} ({m.class}) - {m.phone}</span>
-                                          <button onClick={()=>removeTeamMemberAdmin(viewAttendeesModal, t.leaderId, m.id)} className="text-red-500 text-[10px] font-bold hover:underline">Elimină</button>
+                                          {canManageAttendees && (
+                                            <button onClick={()=>removeTeamMemberAdmin(viewAttendeesModal, t.leaderId, m.id)} className="text-red-500 text-[10px] font-bold hover:underline">Elimină</button>
+                                          )}
                                       </div>
                                   ))}
                               </div>
@@ -695,7 +791,9 @@ export default function AdminPanel() {
                           viewAttendeesModal.attendees?.map((a:any) => (
                               <div key={a.id} className={`flex justify-between items-center p-3 border rounded-xl ${darkMode ? 'border-white/10 bg-black/20' : 'border-slate-200 bg-slate-50'}`}>
                                   <div><p className="font-bold">{a.name}</p><p className="text-xs opacity-60">{a.class} • {a.phone}</p></div>
-                                  <button onClick={()=>removeAttendeeAdmin(viewAttendeesModal, a.id)} className="text-red-500 text-xs font-bold hover:underline">Elimină</button>
+                                  {canManageAttendees && (
+                                      <button onClick={()=>removeAttendeeAdmin(viewAttendeesModal, a.id)} className="text-red-500 text-xs font-bold hover:underline">Elimină</button>
+                                  )}
                               </div>
                           ))
                       )}

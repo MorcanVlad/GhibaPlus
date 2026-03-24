@@ -201,11 +201,25 @@ function ForumContent() {
           imageUrl = await uploadImageToStorage(newPostImage, "forum_posts");
       }
 
+      const safeTitle = censorText(newPostTitle);
       const safeText = censorText(newPostText);
       const postTags = extractTags(safeText);
 
+      // NOU: Jurnalizăm tentativa de folosire a cuvintelor interzise
+      if (safeText !== newPostText || safeTitle !== newPostTitle) {
+          try {
+              await addDoc(collection(db, "security_logs"), {
+                  action: "CENZURAT_POSTARE",
+                  userName: user.name,
+                  userRole: user.role,
+                  details: `A încercat să folosească limbaj interzis în postare.\nConținut original titlu: "${newPostTitle}"\nConținut original descriere: "${newPostText}"`,
+                  timestamp: new Date().toISOString()
+              });
+          } catch(e) {}
+      }
+
       const newPostRef = await addDoc(collection(db, "forum_posts"), {
-          title: censorText(newPostTitle), text: safeText, category: newPostCategory, tags: postTags, imageUrl, 
+          title: safeTitle, text: safeText, category: newPostCategory, tags: postTags, imageUrl, 
           authorId: user.id, authorName: user.name, authorRole: user.role,
           createdAt: new Date().toISOString(), likes: [], replies: [], locked: false, pinned: false
       });
@@ -215,7 +229,7 @@ function ForumContent() {
       for (const followerId of myFollowers) {
           await addDoc(collection(db, "users", followerId, "notifications"), {
               title: `📢 ${user.name} a postat ceva nou!`,
-              message: censorText(newPostTitle),
+              message: safeTitle,
               postId: newPostRef.id,
               sentAt: new Date().toISOString(),
               read: false
@@ -261,9 +275,24 @@ function ForumContent() {
           finalMessage = `@${currentReplyTarget.userName} ` + finalMessage;
       }
 
+      const safeText = censorText(finalMessage);
+
+      // NOU: Jurnalizăm tentativa pe comentariu
+      if (safeText !== finalMessage) {
+          try {
+              await addDoc(collection(db, "security_logs"), {
+                  action: "CENZURAT_COMENTARIU",
+                  userName: user.name,
+                  userRole: user.role,
+                  details: `A încercat să folosească limbaj interzis în comentariu.\nConținut original: "${finalMessage}"`,
+                  timestamp: new Date().toISOString()
+              });
+          } catch(e) {}
+      }
+
       const newReply = { 
           id: Date.now().toString(), 
-          text: censorText(finalMessage), 
+          text: safeText, 
           imageUrl: replyImageUrl,
           authorId: user.id, authorName: user.name, authorRole: user.role, 
           createdAt: new Date().toISOString(),
@@ -311,6 +340,19 @@ function ForumContent() {
 
   const deletePost = async (postId: string) => {
       if(!confirm("Ștergi această discuție definitiv?")) return;
+      
+      const postToDelete = forumPosts.find(p => p.id === postId);
+      
+      try {
+          await addDoc(collection(db, "security_logs"), {
+              action: "ȘTERGERE_POSTARE_FORUM",
+              userName: user.name,
+              userRole: user.role,
+              details: `A șters o discuție din forum.\nTitlu postare: "${postToDelete?.title || 'Necunoscut'}"\nConținut postare: "${postToDelete?.text || 'Fără text'}"`,
+              timestamp: new Date().toISOString()
+          });
+      } catch(e) {}
+
       await deleteDoc(doc(db, "forum_posts", postId));
   };
 
@@ -318,12 +360,38 @@ function ForumContent() {
       if(!confirm("Ștergi acest răspuns?")) return;
       const post = forumPosts.find(p => p.id === postId);
       if (!post) return;
+      
+      const replyToDelete = post.replies.find((r:any) => r.id === replyId);
+
+      try {
+          await addDoc(collection(db, "security_logs"), {
+              action: "ȘTERGERE_COMENTARIU",
+              userName: user.name,
+              userRole: user.role,
+              details: `A șters un răspuns de la postarea "${post.title}".\nConținut comentariu: "${replyToDelete?.text || 'Fără text'}"`,
+              timestamp: new Date().toISOString()
+          });
+      } catch(e) {}
+
       const updatedReplies = post.replies.filter((r:any) => r.id !== replyId);
       await updateDoc(doc(db, "forum_posts", postId), { replies: updatedReplies });
   };
 
   const handleMassDelete = async () => {
       if (!confirm(`⚠️ ATENȚIE: Ești sigur că vrei să ștergi TOATE cele ${adminUserForumPosts.length} postări ale acestui utilizator? Acțiunea este ireversibilă.`)) return;
+      
+      const deletedTitles = adminUserForumPosts.map(p => p.title).join(', ');
+      
+      try {
+          await addDoc(collection(db, "security_logs"), {
+              action: "ȘTERGERE_ÎN_MASĂ",
+              userName: user.name,
+              userRole: user.role,
+              details: `A șters în masă TOATE cele ${adminUserForumPosts.length} postări ale utilizatorului cu ID: ${adminUserModal.id} (${adminUserModal.name}).\nTitluri șterse: ${deletedTitles}`,
+              timestamp: new Date().toISOString()
+          });
+      } catch(e) {}
+
       for (const p of adminUserForumPosts) {
           await deleteDoc(doc(db, "forum_posts", p.id));
       }
