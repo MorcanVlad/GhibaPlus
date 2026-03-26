@@ -13,7 +13,7 @@ export default function AdminPanel() {
   const [whitelistDb, setWhitelistDb] = useState<any[]>([]);
   
   const [adminMessages, setAdminMessages] = useState<any[]>([]);
-  const [securityLogs, setSecurityLogs] = useState<any[]>([]); // NOU: State pentru log-uri
+  const [securityLogs, setSecurityLogs] = useState<any[]>([]);
   
   const [darkMode, setDarkMode] = useState(true);
   
@@ -22,7 +22,7 @@ export default function AdminPanel() {
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
+  const [imageUrls, setImageUrls] = useState<string[]>([]); // NOU: Suport imagini multiple
   const [isUploadingImg, setIsUploadingImg] = useState(false); 
   
   const [authorName, setAuthorName] = useState("");
@@ -53,7 +53,7 @@ export default function AdminPanel() {
   const [emailList, setEmailList] = useState("");
   const [whitelistSearch, setWhitelistSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");
-  const [logSearch, setLogSearch] = useState(""); // NOU: Căutare pentru log-uri
+  const [logSearch, setLogSearch] = useState(""); 
   
   const [viewAttendeesModal, setViewAttendeesModal] = useState<any>(null);
   const [viewUserHistory, setViewUserHistory] = useState<any>(null);
@@ -74,7 +74,6 @@ export default function AdminPanel() {
               onSnapshot(query(collection(db, "admin_messages"), orderBy("createdAt", "desc")), (s) => {
                   setAdminMessages(s.docs.map(d => ({id: d.id, ...d.data()})));
               });
-              // NOU: Ascultăm log-urile de securitate
               onSnapshot(query(collection(db, "security_logs"), orderBy("timestamp", "desc")), (s) => {
                   setSecurityLogs(s.docs.map(d => ({id: d.id, ...d.data()})));
               });
@@ -102,12 +101,13 @@ export default function AdminPanel() {
   const handleDelete = async (id: string, col: string) => {
     if(!confirm("Ești sigur că vrei să ștergi definitiv?")) return;
     
-    // NOU: Jurnalizăm ștergerea (cu detalii despre ce a fost șters)
     const itemToDelete = posts.find(p => p.id === id) || users.find(u => u.id === id) || whitelistDb.find(w => w.id === id);
     let detailsText = `A șters un document cu ID-ul: ${id} din colecția: ${col}`;
     
+    // NOU: Jurnalizare mai detaliată (include cine a postat)
     if (itemToDelete?.title) {
-        detailsText = `A șters o postare din gestiune.\nTitlu: "${itemToDelete.title}"\nConținut: "${itemToDelete.content || 'Fără text'}"`;
+        const originalAuthor = itemToDelete.authorName || itemToDelete.organizers || "Necunoscut";
+        detailsText = `A șters o postare din gestiune.\nPostată inițial de: ${originalAuthor}\nTitlu: "${itemToDelete.title}"\nConținut: "${itemToDelete.content || 'Fără text'}"`;
     } else if (itemToDelete?.name) {
         detailsText = `A șters utilizatorul: ${itemToDelete.name} (${itemToDelete.email})`;
     }
@@ -127,7 +127,7 @@ export default function AdminPanel() {
   };
 
   const resetForm = () => {
-      setTitle(""); setContent(""); setImageUrl(""); setAuthorName(""); setOrganizerPhone("");
+      setTitle(""); setContent(""); setImageUrls([]); setAuthorName(""); setOrganizerPhone("");
       setSelectedClasses([]); setStartDate(""); setEndDate(""); setStartTime("");
       setEndTime(""); setHasTime(false); setEvLoc(""); setSpots(0);
       setIsTeamEvent(false); setTeamSize(2); setTeamRule("any");
@@ -139,19 +139,28 @@ export default function AdminPanel() {
       resetForm();
   };
 
+  // NOU: Logica pentru încărcare imagini multiple
   const handleUploadCover = async (e: any) => {
-      const file = e.target.files[0];
-      if (!file) return;
+      const files = Array.from(e.target.files) as File[];
+      if (!files.length) return;
       setIsUploadingImg(true);
       try {
-          const storageRef = ref(storage, `admin_covers/${Date.now()}_${file.name}`);
-          await uploadBytes(storageRef, file);
-          const url = await getDownloadURL(storageRef);
-          setImageUrl(url);
+          const newUrls: string[] = [];
+          for (const file of files) {
+              const storageRef = ref(storage, `admin_covers/${Date.now()}_${file.name}`);
+              await uploadBytes(storageRef, file);
+              const url = await getDownloadURL(storageRef);
+              newUrls.push(url);
+          }
+          setImageUrls(prev => [...prev, ...newUrls]);
       } catch(err) {
-          alert("A apărut o eroare la încărcarea imaginii!");
+          alert("A apărut o eroare la încărcarea imaginilor!");
       }
       setIsUploadingImg(false);
+  };
+
+  const removeImage = (indexToRemove: number) => {
+      setImageUrls(prev => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
   const toggleClass = (c: string) => {
@@ -180,9 +189,14 @@ export default function AdminPanel() {
       setUsers(users.map(u => u.id === userId ? { ...u, class: newClass } : u));
   };
 
+  // NOU: Schimbă clasa automat în Profesor dacă rolul devine admin/profesor
   const handleUserRoleChange = async (userId: string, newRole: string) => {
-      await updateDoc(doc(db, "users", userId), { role: newRole });
-      setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
+      let updates: any = { role: newRole };
+      if (newRole === 'admin' || newRole === 'profesor') {
+          updates.class = 'Profesor';
+      }
+      await updateDoc(doc(db, "users", userId), updates);
+      setUsers(users.map(u => u.id === userId ? { ...u, ...updates } : u));
   };
 
   const showUserHistory = async (user: any) => {
@@ -238,8 +252,12 @@ export default function AdminPanel() {
 
   const handleEditClick = (post: any) => {
       setEditingPost(post);
-      setTitle(post.title || ""); setContent(post.content || ""); setImageUrl(post.imageUrl || "");
-      setAuthorName(post.authorName || post.organizers || ""); setSelectedClasses(post.targetClasses || ["Toată Școala"]);
+      setTitle(post.title || ""); 
+      setContent(post.content || ""); 
+      // NOU: Incarcă imaginile multiple sau adaptează formatul vechi
+      setImageUrls(post.imageUrls || (post.imageUrl ? [post.imageUrl] : []));
+      setAuthorName(post.authorName || post.organizers || ""); 
+      setSelectedClasses(post.targetClasses || ["Toată Școala"]);
       setLinkedPostId(post.linkedPostId || "");
       if(post.col === 'calendar_events') {
           setEventType(post.type); setStartDate(post.date?.split('T')[0] || ""); setEndDate(post.endDate?.split('T')[0] || "");
@@ -252,19 +270,27 @@ export default function AdminPanel() {
 
   const handleUpdatePost = async (e: React.FormEvent) => {
       e.preventDefault();
-      const updatedData: any = { title, content, imageUrl, targetClasses: selectedClasses.length === 0 ? ["Toată Școala"] : selectedClasses };
+      const updatedData: any = { 
+          title, 
+          content, 
+          imageUrls, // Salvează array-ul de poze
+          imageUrl: imageUrls[0] || "", // Compatibilitate fallback ptr prima poza
+          targetClasses: selectedClasses.length === 0 ? ["Toată Școala"] : selectedClasses 
+      };
       
-      // LOGICĂ DE JURNALIZARE A MODIFICĂRILOR
       let changes = [];
       if (editingPost.title !== title) changes.push(`👉 Titlu vechi: "${editingPost.title}"\n👉 Titlu nou: "${title}"`);
       if (editingPost.content !== content) changes.push(`👉 Conținut vechi: "${editingPost.content}"\n👉 Conținut nou: "${content}"`);
       
+      // NOU: Salvare cine a postat original postarea la jurnalizare
+      const originalAuthor = editingPost.authorName || editingPost.organizers || "Necunoscut";
+
       try {
           await addDoc(collection(db, "security_logs"), {
               action: "EDITARE_POSTARE_ADMIN",
               userName: users.find(u => u.id === currentUserId)?.name || "Necunoscut",
               userRole: currentUserRole,
-              details: `A modificat postarea din '${editingPost.col}'.\n\n${changes.length > 0 ? changes.join('\n\n') : "Au fost modificate doar setări secundare (dată, imagini, clase, etc)." }`,
+              details: `A modificat postarea din '${editingPost.col}'.\nPostată inițial de: ${originalAuthor}\n\n${changes.length > 0 ? changes.join('\n\n') : "Au fost modificate doar setări secundare (dată, imagini, clase, etc)." }`,
               timestamp: new Date().toISOString()
           });
       } catch(e) {}
@@ -289,7 +315,9 @@ export default function AdminPanel() {
   const handleSavePost = async (e: React.FormEvent) => {
     e.preventDefault();
     await addDoc(collection(db, "news"), { 
-        type: "official_news", title, content, imageUrl, 
+        type: "official_news", title, content, 
+        imageUrls, // Array imagini
+        imageUrl: imageUrls[0] || "", // Poza principala
         authorName: authorName || (currentUserRole === 'profesor' ? "Profesor" : "Consiliul Elevilor"), 
         authorId: currentUserId, linkedPostId,
         targetClasses: selectedClasses.length === 0 ? ["Toată Școala"] : selectedClasses, postedAt: new Date().toISOString(), likes: []
@@ -303,7 +331,9 @@ export default function AdminPanel() {
     const finalEndDateISO = endDate ? (hasTime && endTime ? `${endDate}T${endTime}` : `${endDate}T00:00:00`) : finalDateISO;
 
     const eventData: any = { 
-        type: eventType, title, content, imageUrl, date: finalDateISO, endDate: finalEndDateISO, hasTime, startTime, endTime,
+        type: eventType, title, content, 
+        imageUrls, imageUrl: imageUrls[0] || "", 
+        date: finalDateISO, endDate: finalEndDateISO, hasTime, startTime, endTime,
         authorId: currentUserId, 
         targetClasses: selectedClasses.length === 0 ? ["Toată Școala"] : selectedClasses, postedAt: new Date().toISOString(), likes: []
     };
@@ -376,11 +406,10 @@ export default function AdminPanel() {
       ...(currentUserRole === 'admin' ? [
           {id:'notif', icon:'🔔', lbl:'Notificări'}, 
           {id:'whitelist', icon:'📧', lbl:'Aprobă'},
-          {id:'security', icon:'🛡️', lbl:'Securitate'} // NOU: Tab securitate
+          {id:'security', icon:'🛡️', lbl:'Securitate'}
       ] : [])
   ];
 
-  // NOU: Calculăm dacă are permisiunea să modifice participanții pentru evenimentul selectat
   const canManageAttendees = currentUserRole === 'admin' || viewAttendeesModal?.authorId === currentUserId;
 
   return (
@@ -437,7 +466,7 @@ export default function AdminPanel() {
             </div>
         )}
 
-        {/* NOU: TAB SECURITATE */}
+        {/* TAB SECURITATE */}
         {activeTab === "security" && currentUserRole === 'admin' && (
             <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-xl ${cardBg}`}>
                 <h2 className="text-2xl font-black mb-6 flex items-center gap-2 text-purple-500">🛡️ Jurnal Securitate & Acțiuni</h2>
@@ -493,13 +522,25 @@ export default function AdminPanel() {
                     <textarea placeholder="Conținutul..." className={`w-full p-4 rounded-2xl outline-none border h-32 resize-none mb-4 ${inputBg}`} value={content} onChange={e=>setContent(e.target.value)} required />
                     
                     <div className="mb-6">
-                        <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Imagine Copertă (URL sau Upload PC)</label>
-                        <div className="flex gap-2">
-                            <input value={imageUrl} onChange={e=>setImageUrl(e.target.value)} className={`flex-1 p-4 rounded-xl border outline-none ${inputBg}`} placeholder="Ex: https://..." />
-                            <label className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-4 rounded-xl font-bold cursor-pointer flex items-center justify-center transition">
-                                {isUploadingImg ? '⏳' : '📁 Upload'}
-                                <input type="file" accept="image/*" className="hidden" onChange={handleUploadCover} disabled={isUploadingImg} />
-                            </label>
+                        <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Imagini Ataşate (URL sau Upload PC)</label>
+                        <div className="flex flex-col gap-2">
+                            <div className="flex gap-2">
+                                <input value={imageUrls.join(', ')} onChange={e=>setImageUrls(e.target.value.split(',').map(s=>s.trim()).filter(s=>s))} className={`flex-1 p-4 rounded-xl border outline-none ${inputBg}`} placeholder="Ex: https://img1, https://img2" />
+                                <label className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-4 rounded-xl font-bold cursor-pointer flex items-center justify-center transition">
+                                    {isUploadingImg ? '⏳' : '📁 Upload Mai Multe'}
+                                    <input type="file" multiple accept="image/*" className="hidden" onChange={handleUploadCover} disabled={isUploadingImg} />
+                                </label>
+                            </div>
+                            {imageUrls.length > 0 && (
+                                <div className="flex gap-2 flex-wrap mt-2">
+                                    {imageUrls.map((url, i) => (
+                                        <div key={i} className="relative group w-16 h-16 rounded-xl border overflow-hidden shadow-sm">
+                                            <img src={url} alt={`img-${i}`} className="w-full h-full object-cover" />
+                                            <button type="button" onClick={() => removeImage(i)} className="absolute inset-0 bg-red-500/80 text-white font-black opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs">✕</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -595,13 +636,25 @@ export default function AdminPanel() {
                 <textarea placeholder="Conținutul anunțului..." className={`w-full p-4 rounded-2xl outline-none border h-32 resize-none mb-4 ${inputBg}`} value={content} onChange={e=>setContent(e.target.value)} required />
                 
                 <div className="mb-6">
-                    <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Imagine Copertă (URL sau Upload PC)</label>
-                    <div className="flex gap-2">
-                        <input value={imageUrl} onChange={e=>setImageUrl(e.target.value)} className={`flex-1 p-4 rounded-xl border outline-none ${inputBg}`} placeholder="Ex: https://..." />
-                        <label className="bg-red-600 hover:bg-red-500 text-white px-4 py-4 rounded-xl font-bold cursor-pointer flex items-center justify-center transition">
-                            {isUploadingImg ? '⏳' : '📁 Upload'}
-                            <input type="file" accept="image/*" className="hidden" onChange={handleUploadCover} disabled={isUploadingImg} />
-                        </label>
+                    <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Imagini Ataşate (URL sau Upload PC)</label>
+                    <div className="flex flex-col gap-2">
+                        <div className="flex gap-2">
+                            <input value={imageUrls.join(', ')} onChange={e=>setImageUrls(e.target.value.split(',').map(s=>s.trim()).filter(s=>s))} className={`flex-1 p-4 rounded-xl border outline-none ${inputBg}`} placeholder="Ex: https://img1, https://img2" />
+                            <label className="bg-red-600 hover:bg-red-500 text-white px-4 py-4 rounded-xl font-bold cursor-pointer flex items-center justify-center transition">
+                                {isUploadingImg ? '⏳' : '📁 Upload Mai Multe'}
+                                <input type="file" multiple accept="image/*" className="hidden" onChange={handleUploadCover} disabled={isUploadingImg} />
+                            </label>
+                        </div>
+                        {imageUrls.length > 0 && (
+                            <div className="flex gap-2 flex-wrap mt-2">
+                                {imageUrls.map((url, i) => (
+                                    <div key={i} className="relative group w-16 h-16 rounded-xl border overflow-hidden shadow-sm">
+                                        <img src={url} alt={`img-${i}`} className="w-full h-full object-cover" />
+                                        <button type="button" onClick={() => removeImage(i)} className="absolute inset-0 bg-red-500/80 text-white font-black opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs">✕</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -643,13 +696,25 @@ export default function AdminPanel() {
                 <textarea placeholder="Detalii suplimentare..." className={`w-full p-4 rounded-2xl outline-none border h-24 resize-none mb-4 ${inputBg}`} value={content} onChange={e=>setContent(e.target.value)} required />
                 
                 <div className="mb-6">
-                    <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Imagine Copertă (URL sau Upload PC)</label>
-                    <div className="flex gap-2">
-                        <input value={imageUrl} onChange={e=>setImageUrl(e.target.value)} className={`flex-1 p-4 rounded-xl border outline-none ${inputBg}`} placeholder="Ex: https://..." />
-                        <label className="bg-green-600 hover:bg-green-500 text-white px-4 py-4 rounded-xl font-bold cursor-pointer flex items-center justify-center transition">
-                            {isUploadingImg ? '⏳' : '📁 Upload'}
-                            <input type="file" accept="image/*" className="hidden" onChange={handleUploadCover} disabled={isUploadingImg} />
-                        </label>
+                    <label className="text-[10px] font-black uppercase opacity-50 block mb-2">Imagini Ataşate (URL sau Upload PC)</label>
+                    <div className="flex flex-col gap-2">
+                        <div className="flex gap-2">
+                            <input value={imageUrls.join(', ')} onChange={e=>setImageUrls(e.target.value.split(',').map(s=>s.trim()).filter(s=>s))} className={`flex-1 p-4 rounded-xl border outline-none ${inputBg}`} placeholder="Ex: https://img1, https://img2" />
+                            <label className="bg-green-600 hover:bg-green-500 text-white px-4 py-4 rounded-xl font-bold cursor-pointer flex items-center justify-center transition">
+                                {isUploadingImg ? '⏳' : '📁 Upload Mai Multe'}
+                                <input type="file" multiple accept="image/*" className="hidden" onChange={handleUploadCover} disabled={isUploadingImg} />
+                            </label>
+                        </div>
+                        {imageUrls.length > 0 && (
+                            <div className="flex gap-2 flex-wrap mt-2">
+                                {imageUrls.map((url, i) => (
+                                    <div key={i} className="relative group w-16 h-16 rounded-xl border overflow-hidden shadow-sm">
+                                        <img src={url} alt={`img-${i}`} className="w-full h-full object-cover" />
+                                        <button type="button" onClick={() => removeImage(i)} className="absolute inset-0 bg-red-500/80 text-white font-black opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs">✕</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
 
